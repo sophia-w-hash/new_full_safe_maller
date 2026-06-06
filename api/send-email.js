@@ -91,7 +91,7 @@ module.exports = async function handler(req, res) {
     } else if (error.message.includes('Too many login')) {
       safeError = 'Too many attempts. Wait a few minutes.';
     } else if (error.message.includes('quota exceeded')) {
-      safeError = 'Gmail daily limit reached (500/day). Try tomorrow.';
+      safeError = 'Gmail daily limit reached (9500/day). Try tomorrow.';
     } else if (error.message.includes('ECONNREFUSED') || error.message.includes('ETIMEDOUT')) {
       safeError = 'Network error. Check your connection.';
     }
