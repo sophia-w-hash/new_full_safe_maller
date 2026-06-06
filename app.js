@@ -98,7 +98,7 @@ async function sendAll() {
   let failCount = 0;
 
   // ✅ 1 parallel + 400ms gap — fastest inbox-safe combo
-  const BATCH = 2;
+  const BATCH = 4;
   let completed = 0;
 
   for (let i = 0; i < emails.length; i += BATCH) {
