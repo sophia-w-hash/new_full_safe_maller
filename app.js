@@ -3,7 +3,7 @@ function countRecipients() {
   const emails = parseEmails(raw);
   const badge = document.getElementById('recipientCount');
   badge.textContent = `${emails.length} recipient${emails.length !== 1 ? 's' : ''}`;
-  badge.style.background = emails.length > 30 ? '#ef4444' : '#5b5ef4';
+  badge.style.background = emails.length > 50 ? '#ef4444' : '#5b5ef4';
 }
 
 function parseEmails(raw) {
@@ -116,8 +116,8 @@ async function sendAll() {
 
     setProgress(i + 1, emails.length);
 
-    // ✅ 1 sec gap — inbox delivery best rate
-    if (i < emails.length - 1) await sleep(200);
+    // ✅ 2 sec gap — inbox delivery best rate
+    if (i < emails.length - 1) await sleep(2000);
   }
 
   if (failCount === 0) {
