@@ -117,8 +117,8 @@ async function sendAll() {
 
     setProgress(i + 1, emails.length);
 
-    // ✅ 800ms — fastest safe limit for Gmail inbox delivery
-    if (i < emails.length - 1) await sleep(800);
+    // ✅ 300ms — fastest safe limit for Gmail inbox delivery
+    if (i < emails.length - 1) await sleep(300);
   }
 
   if (failCount === 0) {
