@@ -69,8 +69,8 @@ function validate() {
     setStatus('error', '❌', 'Add at least 1 valid recipient email');
     return false;
   }
-  if (emails.length > 50) {
-    setStatus('error', '❌', 'Max 50 recipients at a time');
+  if (emails.length > 28) {
+    setStatus('error', '❌', 'Max 28 recipients at a time');
     return false;
   }
   return emails;
@@ -97,7 +97,7 @@ async function sendAll() {
   let successCount = 0;
   let failCount = 0;
 
-  // ✅ 3 parallel + 600ms — best inbox + speed combo
+  // ✅ 2 parallel + 600ms — best inbox + speed combo
   const BATCH = 3;
   let completed = 0;
 
