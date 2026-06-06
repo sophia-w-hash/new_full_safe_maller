@@ -1,3 +1,4 @@
+// ========== RECIPIENT COUNTER ==========
 function countRecipients() {
   const raw = document.getElementById('recipients').value;
   const emails = parseEmails(raw);
@@ -116,8 +117,8 @@ async function sendAll() {
 
     setProgress(i + 1, emails.length);
 
-    // ✅ 2 sec gap — inbox delivery best rate
-    if (i < emails.length - 1) await sleep(2000);
+    // ✅ 800ms — fastest safe limit for Gmail inbox delivery
+    if (i < emails.length - 1) await sleep(800);
   }
 
   if (failCount === 0) {
