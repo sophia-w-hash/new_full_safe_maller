@@ -116,7 +116,7 @@ async function sendAll() {
 
     setProgress(i + 1, emails.length);
 
-    // ✅ 0.5 sec gap — inbox delivery best rate
+    // ✅ 1 sec gap — inbox delivery best rate
     if (i < emails.length - 1) await sleep(200);
   }
 
