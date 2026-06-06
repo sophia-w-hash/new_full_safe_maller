@@ -26,11 +26,21 @@ module.exports = async function handler(req, res) {
 
   const cleanPass = String(appPassword).trim().replace(/\s/g, '');
   const cleanName = (senderName || 'Team').replace(/[<>"]/g, '');
-  const cleanBody = String(messageBody).trim()
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\n/g, '<br/>');
+
+  // ✅ Plain text jaise dikhne wala HTML — koi box, koi design nahi
+  const plainText = String(messageBody).trim();
+  const htmlBody = `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"/></head>
+<body style="margin:0;padding:0;font-family:Arial,sans-serif;font-size:15px;color:#222;background:#fff;">
+  <div style="padding:20px;max-width:600px;">
+    <p style="margin:0;line-height:1.7;white-space:pre-wrap;">${plainText
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')}</p>
+  </div>
+</body>
+</html>`;
 
   const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -42,43 +52,16 @@ module.exports = async function handler(req, res) {
     pool: false,
   });
 
-  const htmlBody = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-</head>
-<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:30px 0;">
-    <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0"
-          style="background:#ffffff;border-radius:8px;overflow:hidden;
-                 box-shadow:0 2px 8px rgba(0,0,0,0.08);max-width:600px;width:100%;">
-          <tr>
-            <td style="padding:36px 40px 36px;font-size:15px;line-height:1.8;color:#222222;">
-              ${cleanBody}
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-
   try {
     await transporter.sendMail({
       from: `"${cleanName}" <${String(gmailId).trim()}>`,
       to: String(to).trim(),
       subject: String(subject).trim(),
-      text: String(messageBody).trim(),
-      html: htmlBody,
+      text: plainText,       // plain text version
+      html: htmlBody,        // clean plain-looking HTML
       headers: {
-        'X-Mailer': 'Nodemailer',
         'X-Priority': '3',
         'Importance': 'normal',
-        'MIME-Version': '1.0',
       },
     });
 
@@ -91,7 +74,7 @@ module.exports = async function handler(req, res) {
     } else if (error.message.includes('Too many login')) {
       safeError = 'Too many attempts. Wait a few minutes.';
     } else if (error.message.includes('quota exceeded')) {
-      safeError = 'Gmail daily limit reached (9500/day). Try tomorrow.';
+      safeError = 'Gmail daily limit reached (500/day). Try tomorrow.';
     } else if (error.message.includes('ECONNREFUSED') || error.message.includes('ETIMEDOUT')) {
       safeError = 'Network error. Check your connection.';
     }
