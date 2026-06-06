@@ -69,11 +69,20 @@ function validate() {
     setStatus('error', '❌', 'Add at least 1 valid recipient email');
     return false;
   }
-  if (emails.length > 28) {
-    setStatus('error', '❌', 'Max 28 recipients at a time');
+  if (emails.length > 50) {
+    setStatus('error', '❌', 'Max 50 recipients at a time');
     return false;
   }
   return emails;
+}
+
+// ✅ john@gmail.com → "John"
+// wardexcavationllc@gmail.com → "Wardexcavationllc" → clean name
+function getFirstName(email) {
+  const local = email.split('@')[0];
+  const name = local.split(/[.\-_0-9]/)[0];
+  if (!name || name.length < 2) return '';
+  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
 }
 
 async function sendAll() {
@@ -96,35 +105,47 @@ async function sendAll() {
 
   let successCount = 0;
   let failCount = 0;
-
-  // ✅ 2 parallel + 600ms — best inbox + speed combo
-  const BATCH = 3;
   let completed = 0;
 
-  for (let i = 0; i < emails.length; i += BATCH) {
-    const batch = emails.slice(i, i + BATCH);
+  for (let i = 0; i < emails.length; i++) {
+    const to = emails[i];
 
-    const results = await Promise.all(
-      batch.map(async (to) => {
-        try {
-          const res = await fetch('/api/send-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ senderName, gmailId, appPassword, subject, messageBody, to })
-          });
-          const data = await res.json();
-          return res.ok && data.success ? 'ok' : 'fail';
-        } catch {
-          return 'fail';
-        }
-      })
-    );
+    // ✅ Auto name from email — john@gmail.com → "Hi John,"
+    const firstName = getFirstName(to);
+    const greeting = firstName ? `Hi ${firstName},\n\n` : `Hi,\n\n`;
+    const personalBody = greeting + messageBody;
 
-    results.forEach(r => r === 'ok' ? successCount++ : failCount++);
-    completed += batch.length;
+    try {
+      const res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          senderName,
+          gmailId,
+          appPassword,
+          subject,
+          messageBody: personalBody,
+          to
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    } catch {
+      failCount++;
+    }
+
+    completed++;
     setProgress(completed, emails.length);
 
-    if (i + BATCH < emails.length) await sleep(600);
+    // ✅ Random delay — human pattern, spam bypass
+    if (i < emails.length - 1) {
+      const delay = Math.floor(Math.random() * 300) + 400;
+      await sleep(delay);
+    }
   }
 
   if (failCount === 0) {
