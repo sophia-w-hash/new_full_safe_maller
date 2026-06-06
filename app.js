@@ -98,36 +98,26 @@ async function sendAll() {
   let successCount = 0;
   let failCount = 0;
 
-  // ========== FAST SENDING (5 at a time) ==========
-  const BATCH_SIZE = 5;
-  let completed = 0;
+  for (let i = 0; i < emails.length; i++) {
+    try {
+      const res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senderName, gmailId, appPassword, subject, messageBody, to: emails[i] })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    } catch (err) {
+      failCount++;
+    }
 
-  for (let i = 0; i < emails.length; i += BATCH_SIZE) {
-    const batch = emails.slice(i, i + BATCH_SIZE);
-
-    const results = await Promise.all(
-      batch.map(async (to) => {
-        try {
-          const res = await fetch('/api/send-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ senderName, gmailId, appPassword, subject, messageBody, to })
-          });
-          const data = await res.json();
-          return res.ok && data.success ? 'ok' : 'fail';
-        } catch {
-          return 'fail';
-        }
-      })
-    );
-
-    results.forEach(r => r === 'ok' ? successCount++ : failCount++);
-    completed += batch.length;
-    setProgress(completed, emails.length);
-
-    if (i + BATCH_SIZE < emails.length) await sleep(300);
+    setProgress(i + 1, emails.length);
+    if (i < emails.length - 1) await sleep(400);
   }
-  // ========================================================
 
   if (failCount === 0) {
     setStatus('success', '🎉', `All ${successCount} emails sent successfully!`);
