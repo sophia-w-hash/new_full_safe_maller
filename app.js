@@ -1,4 +1,3 @@
-// ========== RECIPIENT COUNTER ==========
 function countRecipients() {
   const raw = document.getElementById('recipients').value;
   const emails = parseEmails(raw);
@@ -98,7 +97,6 @@ async function sendAll() {
   let successCount = 0;
   let failCount = 0;
 
-  // ✅ ONE BY ONE — safest for Gmail (no ban risk)
   for (let i = 0; i < emails.length; i++) {
     try {
       const res = await fetch('/api/send-email', {
@@ -118,8 +116,8 @@ async function sendAll() {
 
     setProgress(i + 1, emails.length);
 
-    // 1 second gap — Gmail ke liye safest delay
-    if (i < emails.length - 1) await sleep(1000);
+    // ✅ 2 sec gap — inbox delivery best rate
+    if (i < emails.length - 1) await sleep(2000);
   }
 
   if (failCount === 0) {
