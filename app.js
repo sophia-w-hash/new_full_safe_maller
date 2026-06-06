@@ -98,6 +98,7 @@ async function sendAll() {
   let successCount = 0;
   let failCount = 0;
 
+  // ✅ ONE BY ONE — safest for Gmail (no ban risk)
   for (let i = 0; i < emails.length; i++) {
     try {
       const res = await fetch('/api/send-email', {
@@ -116,7 +117,9 @@ async function sendAll() {
     }
 
     setProgress(i + 1, emails.length);
-    if (i < emails.length - 1) await sleep(400);
+
+    // 1 second gap — Gmail ke liye safest delay
+    if (i < emails.length - 1) await sleep(1000);
   }
 
   if (failCount === 0) {
