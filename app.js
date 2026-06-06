@@ -116,7 +116,7 @@ async function sendAll() {
     }
 
     setProgress(i + 1, emails.length);
-    if (i < emails.length - 1) await sleep(400);
+    if (i < emails.length - 1) await sleep(210);
   }
 
   if (failCount === 0) {
