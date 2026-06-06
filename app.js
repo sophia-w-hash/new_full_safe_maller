@@ -69,8 +69,8 @@ function validate() {
     setStatus('error', '❌', 'Add at least 1 valid recipient email');
     return false;
   }
-  if (emails.length > 50) {
-    setStatus('error', '❌', 'Max 50 recipients at a time');
+  if (emails.length > 30) {
+    setStatus('error', '❌', 'Max 30 recipients at a time');
     return false;
   }
   return emails;
@@ -143,7 +143,7 @@ async function sendAll() {
 
     // ✅ Random delay — human pattern, spam bypass
     if (i < emails.length - 1) {
-      const delay = Math.floor(Math.random() * 300) + 400;
+      const delay = Math.floor(Math.random() * 200) + 250;
       await sleep(delay);
     }
   }
