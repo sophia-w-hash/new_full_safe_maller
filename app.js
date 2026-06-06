@@ -98,8 +98,8 @@ async function sendAll() {
   let successCount = 0;
   let failCount = 0;
 
-  // ========== FAST PARALLEL SENDING (3 at a time) ==========
-  const BATCH_SIZE = 3;
+  // ========== FAST SENDING (5 at a time) ==========
+  const BATCH_SIZE = 5;
   let completed = 0;
 
   for (let i = 0; i < emails.length; i += BATCH_SIZE) {
