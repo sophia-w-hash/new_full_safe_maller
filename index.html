@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Fast Mail Launcher</title>
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet"/>
+</head>
+<body>
+  <div class="bg-grid"></div>
+
+  <div class="wrapper">
+    <div class="card">
+      <div class="card-header">
+        <div class="logo-wrap">
+          <span class="logo-icon">📧</span>
+        </div>
+        <h1 class="title">Fast Mail Launcher</h1>
+        <p class="subtitle">Send bulk emails instantly with Gmail</p>
+      </div>
+
+      <div class="status-bar" id="statusBar">
+        <span id="statusIcon">⚡</span>
+        <span id="statusText">Ready to launch</span>
+      </div>
+
+      <div class="form-grid">
+        <div class="input-group">
+          <label>Sender Name</label>
+          <input type="text" id="senderName" placeholder="e.g. John Doe" />
+        </div>
+        <div class="input-group">
+          <label>Your Gmail</label>
+          <input type="email" id="gmailId" placeholder="you@gmail.com" />
+        </div>
+
+        <div class="input-group">
+          <label>Gmail App Password</label>
+          <div class="pass-wrap">
+            <input type="password" id="appPassword" placeholder="xxxx xxxx xxxx xxxx" />
+            <button class="eye-btn" onclick="togglePass()">👁</button>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Subject</label>
+          <input type="text" id="subject" placeholder="Enter email subject..." />
+        </div>
+
+        <div class="input-group full">
+          <label>Message Body</label>
+          <textarea id="messageBody" rows="5" placeholder="Write your email message here..."></textarea>
+        </div>
+
+        <div class="input-group full">
+          <label>
+            Recipients
+            <span class="badge" id="recipientCount">0 recipients</span>
+          </label>
+          <textarea id="recipients" rows="5" placeholder="Enter emails separated by comma or newline&#10;example@gmail.com, another@yahoo.com&#10;&#10;Max 50 emails at a time" oninput="countRecipients()"></textarea>
+        </div>
+      </div>
+
+      <div class="progress-wrap" id="progressWrap" style="display:none">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <span id="progressText">Sending 0 / 0</span>
+      </div>
+
+      <div class="log-box" id="logBox" style="display:none">
+        <div class="log-header">
+          <span>📋 Send Log</span>
+          <button onclick="clearLog()">Clear</button>
+        </div>
+        <div id="logList"></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-send" id="sendBtn" onclick="sendAll()">
+          <span>🚀</span> Send All
+        </button>
+        <button class="btn-logout" ondblclick="logoutAll()">
+          <span>🟠</span> Logout<br/><small>(double click)</small>
+        </button>
+      </div>
+
+      <p class="footer-note">🔒 Your credentials are never stored. Session only.</p>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
