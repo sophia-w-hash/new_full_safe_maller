@@ -131,9 +131,8 @@ async function sendAll() {
     completed++;
     setProgress(completed, emails.length);
 
-    if (i < emails.length - 2) {
-      // ✅ Random delay — human pattern
-      const delay = Math.floor(Math.random() * 300) + 500;
+    if (i < emails.length - 1) {
+      const delay = Math.floor(Math.random() * 600) + 800;
       await sleep(delay);
     }
   }
