@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Fast Mail Launcher</title>
-  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/style.css"/>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 </head>
 <body>
@@ -43,7 +43,7 @@
         </div>
         <div class="input-group full">
           <label>Message Body</label>
-          <textarea id="messageBody" rows="6" placeholder="Write your email message here..."></textarea>
+          <textarea id="messageBody" rows="6" placeholder="Write your message here..."></textarea>
         </div>
         <div class="input-group full">
           <label>
@@ -51,7 +51,7 @@
             <span class="badge" id="recipientCount">0 recipients</span>
           </label>
           <textarea id="recipients" rows="5"
-            placeholder="Enter emails separated by comma or newline&#10;example@gmail.com&#10;&#10;Max 50 emails at a time"></textarea>
+            placeholder="Enter emails separated by comma or newline&#10;example@gmail.com&#10;&#10;Max 50 at a time"></textarea>
         </div>
       </div>
       <div class="progress-wrap" id="progressWrap" style="display:none">
@@ -68,12 +68,8 @@
         <div id="logList"></div>
       </div>
       <div class="btn-row">
-        <button class="btn-send" id="sendBtn" onclick="sendAll()" type="button">
-          🚀 Send All
-        </button>
-        <button class="btn-logout" ondblclick="logoutAll()" type="button">
-          🟠 Logout<br/><small>(double click)</small>
-        </button>
+        <button class="btn-send" id="sendBtn" onclick="sendAll()" type="button">🚀 Send All</button>
+        <button class="btn-logout" ondblclick="logoutAll()" type="button">🟠 Logout<br/><small>(double click)</small></button>
       </div>
       <p class="footer-note">🔒 Credentials never stored — session only</p>
     </div>
