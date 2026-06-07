@@ -96,13 +96,13 @@ async function sendAll() {
 
   let successCount = 0;
   let failCount = 0;
+
+  // ✅ 2 parallel + 800ms gap — fastest inbox-safe combo
+  const BATCH = 2;
   let completed = 0;
 
-  const PARALLEL = 2;
-  const DELAY_MS = 500; // 500ms — fast + safe balance
-
-  for (let i = 0; i < emails.length; i += PARALLEL) {
-    const batch = emails.slice(i, i + PARALLEL);
+  for (let i = 0; i < emails.length; i += BATCH) {
+    const batch = emails.slice(i, i + BATCH);
 
     const results = await Promise.all(
       batch.map(async (to) => {
@@ -110,14 +110,7 @@ async function sendAll() {
           const res = await fetch('/api/send-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              senderName,
-              gmailId,
-              appPassword,
-              subject,
-              messageBody, // ✅ exactly same — koi change nahi
-              to
-            })
+            body: JSON.stringify({ senderName, gmailId, appPassword, subject, messageBody, to })
           });
           const data = await res.json();
           return res.ok && data.success ? 'ok' : 'fail';
@@ -131,7 +124,7 @@ async function sendAll() {
     completed += batch.length;
     setProgress(completed, emails.length);
 
-    if (i + PARALLEL < emails.length) await sleep(DELAY_MS);
+    if (i + BATCH < emails.length) await sleep(800);
   }
 
   if (failCount === 0) {
