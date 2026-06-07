@@ -69,8 +69,8 @@ function validate() {
     setStatus('error', '❌', 'Add at least 1 valid recipient email');
     return false;
   }
-  if (emails.length > 28) {
-    setStatus('error', '❌', 'Max 28 recipients at a time');
+  if (emails.length > 50) {
+    setStatus('error', '❌', 'Max 50 recipients at a time');
     return false;
   }
   return emails;
@@ -98,40 +98,40 @@ async function sendAll() {
   let failCount    = 0;
   let completed    = 0;
 
-  const PARALLEL = 2;
-  const DELAY_MS = 500;
+  // ✅ One by one — safest for inbox
+  // Random delay 500-600ms — bilkul human jaisa pattern
+  for (let i = 0; i < emails.length; i++) {
+    try {
+      const res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          senderName,
+          gmailId,
+          appPassword,
+          subject,
+          messageBody,
+          to: emails[i]
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    } catch {
+      failCount++;
+    }
 
-  for (let i = 0; i < emails.length; i += PARALLEL) {
-    const batch = emails.slice(i, i + PARALLEL);
-
-    const results = await Promise.all(
-      batch.map(async (to) => {
-        try {
-          const res = await fetch('/api/send-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              senderName,
-              gmailId,
-              appPassword,
-              subject,
-              messageBody,
-              to
-            })
-          });
-          const data = await res.json();
-          return res.ok && data.success ? 'ok' : 'fail';
-        } catch {
-          return 'fail';
-        }
-      })
-    );
-
-    results.forEach(r => r === 'ok' ? successCount++ : failCount++);
-    completed += batch.length;
+    completed++;
     setProgress(completed, emails.length);
 
-    if (i + PARALLEL < emails.length) await sleep(DELAY_MS);
+    // ✅ Random 500-600ms — spam filter ko lagta hai human bhej raha hai
+    if (i < emails.length - 1) {
+      const delay = Math.floor(Math.random() * 500) + 600;
+      await sleep(delay);
+    }
   }
 
   if (failCount === 0) {
