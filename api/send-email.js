@@ -17,30 +17,14 @@ module.exports = async function handler(req, res) {
   }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(String(to).trim()))      return res.status(400).json({ error: 'Invalid recipient email' });
+  if (!emailRegex.test(String(to).trim()))     return res.status(400).json({ error: 'Invalid recipient email' });
   if (!emailRegex.test(String(gmailId).trim())) return res.status(400).json({ error: 'Invalid Gmail address' });
 
   if (subject.length > 200)      return res.status(400).json({ error: 'Subject too long' });
-  if (messageBody.length > 5000) return res.status(400).json({ error: 'Message too long' });
+  if (messageBody.length > 5000) return res.status(400).json({ error: 'Message too long (max 5000 chars)' });
   if (senderName && senderName.length > 60) return res.status(400).json({ error: 'Sender name too long' });
 
   const cleanPass = String(appPassword).trim().replace(/\s/g, '');
-  const cleanName = (senderName || 'Team').replace(/[<>"]/g, '');
-
-  // ✅ Plain text jaise dikhne wala HTML — koi box, koi design nahi
-  const plainText = String(messageBody).trim();
-  const htmlBody = `<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"/></head>
-<body style="margin:0;padding:0;font-family:Arial,sans-serif;font-size:15px;color:#222;background:#fff;">
-  <div style="padding:20px;max-width:600px;">
-    <p style="margin:0;line-height:1.7;white-space:pre-wrap;">${plainText
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')}</p>
-  </div>
-</body>
-</html>`;
 
   const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -48,37 +32,48 @@ module.exports = async function handler(req, res) {
       user: String(gmailId).trim(),
       pass: cleanPass,
     },
-    tls: { rejectUnauthorized: true },
-    pool: false,
+    tls: { rejectUnauthorized: true }
   });
 
   try {
     await transporter.sendMail({
-      from: `"${cleanName}" <${String(gmailId).trim()}>`,
+      from: `"${(senderName || 'Fast Mail Launcher').replace(/[<>"]/g, '')}" <${String(gmailId).trim()}>`,
       to: String(to).trim(),
       subject: String(subject).trim(),
-      text: plainText,       // plain text version
-      html: htmlBody,        // clean plain-looking HTML
-      headers: {
-        'X-Priority': '3',
-        'Importance': 'normal',
-      },
+      text: String(messageBody).trim(),
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+          <div style="white-space:pre-wrap;line-height:1.7;color:#222;font-size:15px;">
+            ${String(messageBody).trim()
+              .replace(/&/g,'&amp;')
+              .replace(/</g,'&lt;')
+              .replace(/>/g,'&gt;')
+              .replace(/\n/g,'<br/>')}
+          </div>
+          <hr style="margin-top:32px;border:none;border-top:1px solid #eee;"/>
+          <p style="font-size:11px;color:#bbb;margin-top:8px;">Sent via Fast Mail Launcher</p>
+        </div>
+      `,
     });
 
     return res.status(200).json({ success: true });
 
   } catch (error) {
-    let safeError = 'Failed to send. Please try again.';
-    if (error.message.includes('Invalid login') || error.message.includes('BadCredentials')) {
-      safeError = 'Invalid Gmail or App Password. Make sure 2-Step Verification is ON.';
-    } else if (error.message.includes('Too many login')) {
-      safeError = 'Too many attempts. Wait a few minutes.';
-    } else if (error.message.includes('quota exceeded')) {
-      safeError = 'Gmail daily limit reached (500/day). Try tomorrow.';
-    } else if (error.message.includes('ECONNREFUSED') || error.message.includes('ETIMEDOUT')) {
-      safeError = 'Network error. Check your connection.';
+    let safeError = 'Failed to send email. Please try again.';
+
+    if (error.message) {
+      if (error.message.includes('Invalid login') || error.message.includes('Username and Password') || error.message.includes('BadCredentials')) {
+        safeError = 'Invalid Gmail or App Password. Make sure 2-Step Verification is ON.';
+      } else if (error.message.includes('Too many login')) {
+        safeError = 'Too many attempts. Please wait a few minutes.';
+      } else if (error.message.includes('ECONNREFUSED') || error.message.includes('ETIMEDOUT') || error.message.includes('ENOTFOUND')) {
+        safeError = 'Network error. Check your connection.';
+      } else if (error.message.includes('Daily user sending quota exceeded')) {
+        safeError = 'Gmail daily limit reached (500/day). Try again tomorrow.';
+      }
     }
-    console.error('[send-email]', error.code || error.message);
+
+    console.error('[send-email] Error:', error.code || error.message);
     return res.status(500).json({ error: safeError });
   }
 };
