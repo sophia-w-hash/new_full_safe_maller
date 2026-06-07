@@ -22,48 +22,29 @@ module.exports = async function handler(req, res) {
   if (messageBody.length > 5000)                return res.status(400).json({ error: 'Message too long' });
   if (senderName && senderName.length > 60)     return res.status(400).json({ error: 'Sender name too long' });
 
-  const cleanPass = String(appPassword).trim().replace(/\s/g, '');
-  const cleanName = (senderName || 'Team').replace(/[<>"]/g, '');
-  const plainText = String(messageBody).trim();
-
-  // ✅ Bilkul plain — real human email jaisi, koi styling nahi
-  const htmlBody = `<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"/></head>
-<body style="margin:0;padding:0;background:#ffffff;font-family:Arial,sans-serif;">
-<div style="font-size:14px;line-height:1.6;color:#000000;padding:16px;">
-<p style="margin:0;white-space:pre-wrap;">${plainText
-  .replace(/&/g, '&amp;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;')
-}</p>
-</div>
-</body>
-</html>`;
+  const cleanPass  = String(appPassword).trim().replace(/\s/g, '');
+  const cleanName  = (senderName || 'Team').replace(/[<>"]/g, '');
+  const plainText  = String(messageBody).trim();
+  const toAddress  = String(to).trim();
+  const fromAddress = String(gmailId).trim();
 
   const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 587,
     secure: false,
-    auth: {
-      user: String(gmailId).trim(),
-      pass: cleanPass,
-    },
+    auth: { user: fromAddress, pass: cleanPass },
     tls: { rejectUnauthorized: true },
     pool: false,
   });
 
+  // ✅ Only plain text — no HTML at all
+  // Plain text emails have highest inbox rate
   try {
     await transporter.sendMail({
-      from: `"${cleanName}" <${String(gmailId).trim()}>`,
-      to: String(to).trim(),
+      from: `"${cleanName}" <${fromAddress}>`,
+      to: toAddress,
       subject: String(subject).trim(),
-      text: plainText,
-      html: htmlBody,
-      headers: {
-        'X-Priority': '3',
-        'Importance': 'normal',
-      },
+      text: plainText,   // ✅ ONLY plain text — no HTML
     });
 
     return res.status(200).json({ success: true });
