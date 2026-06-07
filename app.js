@@ -1,7 +1,5 @@
-// Auto count on page load bhi
 document.addEventListener('DOMContentLoaded', function () {
-  const el = document.getElementById('recipients');
-  if (el) el.addEventListener('input', countRecipients);
+  document.getElementById('recipients').addEventListener('input', countRecipients);
 });
 
 function countRecipients() {
@@ -92,7 +90,6 @@ async function sendAll() {
   const subject     = document.getElementById('subject').value.trim();
   const messageBody = document.getElementById('messageBody').value.trim();
 
-  // ✅ Button disable + Sending text
   const btn = document.getElementById('sendBtn');
   btn.disabled = true;
   btn.innerHTML = '⏳ Sending...';
@@ -135,6 +132,7 @@ async function sendAll() {
     setProgress(completed, emails.length);
 
     if (i < emails.length - 1) {
+      // ✅ Random delay — human pattern
       const delay = Math.floor(Math.random() * 600) + 800;
       await sleep(delay);
     }
@@ -154,7 +152,6 @@ async function sendAll() {
 
   addLog('info', '📊', `Total: ${emails.length} | ✅ ${successCount} success  ❌ ${failCount} failed`);
 
-  // ✅ Button wapas enable
   btn.disabled = false;
   btn.innerHTML = '🚀 Send All';
   btn.style.opacity = '1';
