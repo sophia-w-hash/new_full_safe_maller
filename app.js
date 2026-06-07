@@ -3,7 +3,7 @@ function countRecipients() {
   const emails = parseEmails(raw);
   const badge = document.getElementById('recipientCount');
   badge.textContent = `${emails.length} recipient${emails.length !== 1 ? 's' : ''}`;
-  badge.style.background = emails.length > 50 ? '#dc2626' : '#4f46e5';
+  badge.style.background = emails.length > 50 ? '#ef4444' : '#5b5ef4';
 }
 
 function parseEmails(raw) {
@@ -88,34 +88,50 @@ async function sendAll() {
 
   const btn = document.getElementById('sendBtn');
   btn.disabled = true;
-  btn.textContent = '⏳ Sending...';
+  btn.innerHTML = '<span>⏳</span> Sending...';
 
   clearLog();
   setStatus('sending', '📤', `Sending to ${emails.length} recipients...`);
   setProgress(0, emails.length);
 
   let successCount = 0;
-  let failCount    = 0;
-  let completed    = 0;
+  let failCount = 0;
+  let completed = 0;
 
-  for (let i = 0; i < emails.length; i++) {
-    try {
-      const res = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ senderName, gmailId, appPassword, subject, messageBody, to: emails[i] })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) { successCount++; } else { failCount++; }
-    } catch { failCount++; }
+  const PARALLEL = 2;
+  const DELAY_MS = 500; // 500ms — fast + safe balance
 
-    completed++;
+  for (let i = 0; i < emails.length; i += PARALLEL) {
+    const batch = emails.slice(i, i + PARALLEL);
+
+    const results = await Promise.all(
+      batch.map(async (to) => {
+        try {
+          const res = await fetch('/api/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              senderName,
+              gmailId,
+              appPassword,
+              subject,
+              messageBody, // ✅ exactly same — koi change nahi
+              to
+            })
+          });
+          const data = await res.json();
+          return res.ok && data.success ? 'ok' : 'fail';
+        } catch {
+          return 'fail';
+        }
+      })
+    );
+
+    results.forEach(r => r === 'ok' ? successCount++ : failCount++);
+    completed += batch.length;
     setProgress(completed, emails.length);
 
-    if (i < emails.length - 1) {
-      const delay = Math.floor(Math.random() * 600) + 800;
-      await sleep(delay);
-    }
+    if (i + PARALLEL < emails.length) await sleep(DELAY_MS);
   }
 
   if (failCount === 0) {
@@ -123,7 +139,7 @@ async function sendAll() {
     addLog('ok', '✅', `${successCount} emails delivered successfully`);
   } else if (successCount === 0) {
     setStatus('error', '💥', `All ${failCount} emails failed. Check credentials.`);
-    addLog('fail', '❌', `All ${failCount} failed — check Gmail & App Password`);
+    addLog('fail', '❌', `All ${failCount} emails failed — check Gmail & App Password`);
   } else {
     setStatus('sending', '⚠️', `${successCount} sent, ${failCount} failed`);
     addLog('ok', '✅', `${successCount} delivered`);
@@ -131,13 +147,18 @@ async function sendAll() {
   }
 
   addLog('info', '📊', `Total: ${emails.length} | ✅ ${successCount} success  ❌ ${failCount} failed`);
+
   btn.disabled = false;
-  btn.innerHTML = '🚀 Send All';
+  btn.innerHTML = '<span>🚀</span> Send All';
 }
 
 function logoutAll() {
-  ['senderName','gmailId','appPassword','subject','messageBody','recipients']
-    .forEach(id => document.getElementById(id).value = '');
+  document.getElementById('senderName').value = '';
+  document.getElementById('gmailId').value = '';
+  document.getElementById('appPassword').value = '';
+  document.getElementById('subject').value = '';
+  document.getElementById('messageBody').value = '';
+  document.getElementById('recipients').value = '';
   countRecipients();
   clearLog();
   document.getElementById('progressWrap').style.display = 'none';
