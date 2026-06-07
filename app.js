@@ -69,8 +69,8 @@ function validate() {
     setStatus('error', '❌', 'Add at least 1 valid recipient email');
     return false;
   }
-  if (emails.length > 50) {
-    setStatus('error', '❌', 'Max 50 recipients at a time');
+  if (emails.length > 28) {
+    setStatus('error', '❌', 'Max 28 recipients at a time');
     return false;
   }
   return emails;
@@ -95,11 +95,11 @@ async function sendAll() {
   setProgress(0, emails.length);
 
   let successCount = 0;
-  let failCount = 0;
-  let completed = 0;
+  let failCount    = 0;
+  let completed    = 0;
 
   const PARALLEL = 2;
-  const DELAY_MS = 500; // 500ms — fast + safe balance
+  const DELAY_MS = 500;
 
   for (let i = 0; i < emails.length; i += PARALLEL) {
     const batch = emails.slice(i, i + PARALLEL);
@@ -115,7 +115,7 @@ async function sendAll() {
               gmailId,
               appPassword,
               subject,
-              messageBody, // ✅ exactly same — koi change nahi
+              messageBody,
               to
             })
           });
