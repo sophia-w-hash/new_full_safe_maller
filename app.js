@@ -133,7 +133,7 @@ async function sendAll() {
 
     if (i < emails.length - 1) {
       // ✅ Random delay — human pattern
-      const delay = Math.floor(Math.random() * 600) + 800;
+      const delay = Math.floor(Math.random() * 300) + 400;
       await sleep(delay);
     }
   }
