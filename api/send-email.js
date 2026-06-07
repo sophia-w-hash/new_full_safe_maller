@@ -31,12 +31,43 @@ module.exports = async function handler(req, res) {
   const domain      = fromAddress.split('@')[1] || 'gmail.com';
   const messageId   = `<${crypto.randomUUID()}.${Date.now()}@${domain}>`;
 
-  // ✅ App password length check
   if (cleanPass.length < 16) {
     return res.status(400).json({
-      error: 'App Password must be 16 characters. Get it from Google Account → Security → App Passwords.'
+      error: 'App Password 16 characters hona chahiye. Google Account → Security → App Passwords se banao.'
     });
   }
+
+  // ✅ Spin words — har email thodi alag hogi = spam filter bypass
+  const spinWord = (options) => options[Math.floor(Math.random() * options.length)];
+
+  const greetings  = ['Hi', 'Hello', 'Hey', 'Dear'];
+  const closings   = ['Best regards', 'Kind regards', 'Thanks', 'Warm regards', 'Regards'];
+  const connectors = ['Also,', 'Additionally,', 'Furthermore,', 'Moreover,'];
+
+  // ✅ Recipient ka naam email se nikalo
+  const recipientLocal = toAddress.split('@')[0];
+  const recipientName  = recipientLocal.split(/[.\-_0-9]/)[0];
+  const firstName      = recipientName.length >= 2
+    ? recipientName.charAt(0).toUpperCase() + recipientName.slice(1).toLowerCase()
+    : '';
+
+  // ✅ Message spin karo
+  const greeting  = firstName
+    ? `${spinWord(greetings)} ${firstName},`
+    : `${spinWord(greetings)},`;
+
+  const closing   = `\n\n${spinWord(closings)},\n${cleanName}`;
+  const connector = spinWord(connectors);
+
+  // ✅ Message body mein connector add karo (natural feel)
+  const lines     = plainText.split('\n');
+  let spunBody    = plainText;
+  if (lines.length >= 2) {
+    lines[1] = connector + ' ' + lines[1];
+    spunBody = lines.join('\n');
+  }
+
+  const finalText = `${greeting}\n\n${spunBody}${closing}`;
 
   const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
@@ -51,7 +82,6 @@ module.exports = async function handler(req, res) {
   });
 
   try {
-    // ✅ Connection verify pehle
     await transporter.verify();
 
     await transporter.sendMail({
@@ -59,7 +89,7 @@ module.exports = async function handler(req, res) {
       replyTo: fromAddress,
       to: toAddress,
       subject: String(subject).trim(),
-      text: plainText,
+      text: finalText,
       headers: {
         'Message-ID':                messageId,
         'Date':                      new Date().toUTCString(),
@@ -77,26 +107,15 @@ module.exports = async function handler(req, res) {
 
   } catch (error) {
     console.error('[send-email]', error.code, error.message);
-
     let safeError = 'Failed to send. Try again.';
-
-    if (
-      error.message.includes('Invalid login') ||
-      error.message.includes('BadCredentials') ||
-      error.message.includes('Username and Password') ||
-      error.message.includes('535')
-    ) {
+    if (error.message.includes('Invalid login') || error.message.includes('BadCredentials') || error.message.includes('535'))
       safeError = '❌ Gmail login failed — App Password galat hai ya 2-Step Verification OFF hai.';
-    } else if (error.message.includes('Too many login') || error.message.includes('rate limit')) {
+    else if (error.message.includes('Too many login') || error.message.includes('rate limit'))
       safeError = '⏳ Too many attempts. 10 minute baad try karo.';
-    } else if (error.message.includes('quota exceeded') || error.message.includes('Daily limit')) {
+    else if (error.message.includes('quota exceeded') || error.message.includes('Daily limit'))
       safeError = '📛 Gmail daily limit (500/day) reach ho gaya.';
-    } else if (error.message.includes('ECONNREFUSED') || error.message.includes('ETIMEDOUT') || error.message.includes('ENOTFOUND')) {
-      safeError = '🌐 Network error. Internet connection check karo.';
-    } else if (error.message.includes('certificate') || error.message.includes('TLS')) {
-      safeError = '🔒 SSL/TLS error. Try again.';
-    }
-
+    else if (error.message.includes('ECONNREFUSED') || error.message.includes('ETIMEDOUT') || error.message.includes('ENOTFOUND'))
+      safeError = '🌐 Network error. Internet check karo.';
     return res.status(500).json({ error: safeError });
   }
 };
