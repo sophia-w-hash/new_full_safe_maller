@@ -104,38 +104,42 @@ async function sendAll() {
   let failCount    = 0;
   let completed    = 0;
 
-  for (let i = 0; i < emails.length; i++) {
-    try {
-      const res = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          senderName,
-          gmailId,
-          appPassword,
-          subject,
-          messageBody,
-          to: emails[i]
-        })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        successCount++;
-      } else {
-        failCount++;
-      }
-    } catch {
-      failCount++;
-    }
+  // ✅ 2 parallel + 600ms random delay — fast + safe + inbox friendly
+  const PARALLEL = 2;
+  const DELAY_MS = () => Math.floor(Math.random() * 400) + 600; // 600-700ms random
 
-    completed++;
+  for (let i = 0; i < emails.length; i += PARALLEL) {
+    const batch = emails.slice(i, i + PARALLEL);
+
+    const results = await Promise.all(
+      batch.map(async (to) => {
+        try {
+          const res = await fetch('/api/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              senderName,
+              gmailId,
+              appPassword,
+              subject,
+              messageBody,
+              to
+            })
+          });
+          const data = await res.json();
+          return res.ok && data.success ? 'ok' : 'fail';
+        } catch {
+          return 'fail';
+        }
+      })
+    );
+
+    results.forEach(r => r === 'ok' ? successCount++ : failCount++);
+    completed += batch.length;
     setProgress(completed, emails.length);
 
-    if (i < emails.length - 1) {
-      // ✅ Random delay — human pattern
-      const delay = Math.floor(Math.random() * 300) + 400;
-      await sleep(delay);
-    }
+    // ✅ Random delay between batches
+    if (i + PARALLEL < emails.length) await sleep(DELAY_MS());
   }
 
   if (failCount === 0) {
