@@ -1,5 +1,7 @@
+// Auto count on page load bhi
 document.addEventListener('DOMContentLoaded', function () {
-  document.getElementById('recipients').addEventListener('input', countRecipients);
+  const el = document.getElementById('recipients');
+  if (el) el.addEventListener('input', countRecipients);
 });
 
 function countRecipients() {
@@ -90,6 +92,7 @@ async function sendAll() {
   const subject     = document.getElementById('subject').value.trim();
   const messageBody = document.getElementById('messageBody').value.trim();
 
+  // ✅ Button disable + Sending text
   const btn = document.getElementById('sendBtn');
   btn.disabled = true;
   btn.innerHTML = '⏳ Sending...';
@@ -151,6 +154,7 @@ async function sendAll() {
 
   addLog('info', '📊', `Total: ${emails.length} | ✅ ${successCount} success  ❌ ${failCount} failed`);
 
+  // ✅ Button wapas enable
   btn.disabled = false;
   btn.innerHTML = '🚀 Send All';
   btn.style.opacity = '1';
