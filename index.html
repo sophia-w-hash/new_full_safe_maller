@@ -1,161 +1,102 @@
-function countRecipients() {
-  const raw = document.getElementById('recipients').value;
-  const emails = parseEmails(raw);
-  const badge = document.getElementById('recipientCount');
-  badge.textContent = `${emails.length} recipient${emails.length !== 1 ? 's' : ''}`;
-  badge.style.background = emails.length > 50 ? '#ef4444' : '#5b5ef4';
-}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Fast Mail Launcher</title>
+  <link rel="stylesheet" href="/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet"/>
+</head>
+<body>
+  <div class="bg-grid"></div>
 
-function parseEmails(raw) {
-  return raw
-    .split(/[\n,]+/)
-    .map(e => e.trim().toLowerCase())
-    .filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
-}
+  <div class="wrapper">
+    <div class="card">
 
-function togglePass() {
-  const inp = document.getElementById('appPassword');
-  inp.type = inp.type === 'password' ? 'text' : 'password';
-}
+      <div class="card-header">
+        <div class="logo-wrap">
+          <span>📧</span>
+        </div>
+        <h1 class="title">Fast Mail Launcher</h1>
+        <p class="subtitle">Send bulk emails instantly with Gmail</p>
+      </div>
 
-function setStatus(type, icon, text) {
-  const bar = document.getElementById('statusBar');
-  bar.className = 'status-bar ' + type;
-  document.getElementById('statusIcon').textContent = icon;
-  document.getElementById('statusText').textContent = text;
-}
+      <div class="status-bar" id="statusBar">
+        <span id="statusIcon">⚡</span>
+        <span id="statusText">Ready to launch</span>
+      </div>
 
-function addLog(type, icon, message) {
-  const logBox = document.getElementById('logBox');
-  const logList = document.getElementById('logList');
-  logBox.style.display = 'block';
-  const item = document.createElement('div');
-  item.className = `log-item ${type}`;
-  item.innerHTML = `<span>${icon}</span><span>${message}</span>`;
-  logList.appendChild(item);
-  logBox.scrollTop = logBox.scrollHeight;
-}
+      <div class="form-grid">
 
-function clearLog() {
-  document.getElementById('logList').innerHTML = '';
-  document.getElementById('logBox').style.display = 'none';
-}
+        <div class="input-group">
+          <label>Sender Name</label>
+          <input type="text" id="senderName" placeholder="e.g. John Doe" />
+        </div>
 
-function setProgress(current, total) {
-  const wrap = document.getElementById('progressWrap');
-  wrap.style.display = 'flex';
-  const pct = total > 0 ? Math.round((current / total) * 100) : 0;
-  document.getElementById('progressFill').style.width = pct + '%';
-  document.getElementById('progressText').textContent = `Sending ${current} / ${total}`;
-}
+        <div class="input-group">
+          <label>Your Gmail</label>
+          <input type="email" id="gmailId" placeholder="you@gmail.com" />
+        </div>
 
-function validate() {
-  const fields = [
-    { id: 'senderName',  label: 'Sender Name' },
-    { id: 'gmailId',     label: 'Gmail ID' },
-    { id: 'appPassword', label: 'App Password' },
-    { id: 'subject',     label: 'Subject' },
-    { id: 'messageBody', label: 'Message Body' },
-  ];
-  for (const f of fields) {
-    if (!document.getElementById(f.id).value.trim()) {
-      setStatus('error', '❌', `${f.label} is required`);
-      document.getElementById(f.id).focus();
-      return false;
-    }
-  }
-  const emails = parseEmails(document.getElementById('recipients').value);
-  if (emails.length === 0) {
-    setStatus('error', '❌', 'Add at least 1 valid recipient email');
-    return false;
-  }
-  if (emails.length > 50) {
-    setStatus('error', '❌', 'Max 50 recipients at a time');
-    return false;
-  }
-  return emails;
-}
+        <div class="input-group">
+          <label>Gmail App Password</label>
+          <div class="pass-wrap">
+            <input type="password" id="appPassword" placeholder="xxxx xxxx xxxx xxxx" />
+            <button class="eye-btn" onclick="togglePass()">👁</button>
+          </div>
+        </div>
 
-async function sendAll() {
-  const emails = validate();
-  if (!emails) return;
+        <div class="input-group">
+          <label>Subject</label>
+          <input type="text" id="subject" placeholder="Enter email subject..." />
+        </div>
 
-  const senderName  = document.getElementById('senderName').value.trim();
-  const gmailId     = document.getElementById('gmailId').value.trim();
-  const appPassword = document.getElementById('appPassword').value.trim();
-  const subject     = document.getElementById('subject').value.trim();
-  const messageBody = document.getElementById('messageBody').value.trim();
+        <div class="input-group full">
+          <label>Message Body</label>
+          <textarea id="messageBody" rows="5" placeholder="Write your email message here..."></textarea>
+        </div>
 
-  const btn = document.getElementById('sendBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<span>⏳</span> Sending...';
+        <div class="input-group full">
+          <label>
+            Recipients
+            <span class="badge" id="recipientCount">0 recipients</span>
+          </label>
+          <textarea id="recipients" rows="5"
+            placeholder="Enter emails separated by comma or newline&#10;example@gmail.com, another@yahoo.com&#10;&#10;Max 50 emails at a time"
+            oninput="countRecipients()"></textarea>
+        </div>
 
-  clearLog();
-  setStatus('sending', '📤', `Sending to ${emails.length} recipients...`);
-  setProgress(0, emails.length);
+      </div>
 
-  let successCount = 0;
-  let failCount = 0;
+      <div class="progress-wrap" id="progressWrap" style="display:none">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <span id="progressText">Sending 0 / 0</span>
+      </div>
 
-  // ✅ 3 parallel + 600ms — best inbox + speed combo
-  const BATCH = 3;
-  let completed = 0;
+      <div class="log-box" id="logBox" style="display:none">
+        <div class="log-header">
+          <span>📋 Send Log</span>
+          <button onclick="clearLog()">Clear</button>
+        </div>
+        <div id="logList"></div>
+      </div>
 
-  for (let i = 0; i < emails.length; i += BATCH) {
-    const batch = emails.slice(i, i + BATCH);
+      <div class="btn-row">
+        <button class="btn-send" id="sendBtn" onclick="sendAll()">
+          <span>🚀</span> Send All
+        </button>
+        <button class="btn-logout" ondblclick="logoutAll()">
+          <span>🟠</span> Logout<br/><small>(double click)</small>
+        </button>
+      </div>
 
-    const results = await Promise.all(
-      batch.map(async (to) => {
-        try {
-          const res = await fetch('/api/send-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ senderName, gmailId, appPassword, subject, messageBody, to })
-          });
-          const data = await res.json();
-          return res.ok && data.success ? 'ok' : 'fail';
-        } catch {
-          return 'fail';
-        }
-      })
-    );
+      <p class="footer-note">🔒 Your credentials are never stored. Session only.</p>
 
-    results.forEach(r => r === 'ok' ? successCount++ : failCount++);
-    completed += batch.length;
-    setProgress(completed, emails.length);
+    </div>
+  </div>
 
-    if (i + BATCH < emails.length) await sleep(600);
-  }
-
-  if (failCount === 0) {
-    setStatus('success', '🎉', `All ${successCount} emails sent successfully!`);
-    addLog('ok', '✅', `${successCount} emails delivered successfully`);
-  } else if (successCount === 0) {
-    setStatus('error', '💥', `All ${failCount} emails failed. Check credentials.`);
-    addLog('fail', '❌', `All ${failCount} emails failed — check Gmail & App Password`);
-  } else {
-    setStatus('sending', '⚠️', `${successCount} sent, ${failCount} failed`);
-    addLog('ok', '✅', `${successCount} delivered`);
-    addLog('fail', '❌', `${failCount} failed`);
-  }
-
-  addLog('info', '📊', `Total: ${emails.length} | ✅ ${successCount} success  ❌ ${failCount} failed`);
-
-  btn.disabled = false;
-  btn.innerHTML = '<span>🚀</span> Send All';
-}
-
-function logoutAll() {
-  document.getElementById('senderName').value = '';
-  document.getElementById('gmailId').value = '';
-  document.getElementById('appPassword').value = '';
-  document.getElementById('subject').value = '';
-  document.getElementById('messageBody').value = '';
-  document.getElementById('recipients').value = '';
-  countRecipients();
-  clearLog();
-  document.getElementById('progressWrap').style.display = 'none';
-  setStatus('', '⚡', 'Ready to launch');
-}
-
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+  <script src="/app.js"></script>
+</body>
+</html>
