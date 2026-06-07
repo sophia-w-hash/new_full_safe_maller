@@ -1,5 +1,5 @@
 {
-  "name": "safe-mail-launcher",
+  "name": "fast-mail-launcher",
   "version": "1.0.0",
   "dependencies": {
     "nodemailer": "^6.9.13"
