@@ -98,9 +98,8 @@ async function sendAll() {
   let failCount = 0;
   let completed = 0;
 
-  // ✅ Gmail safe limits
-  const PARALLEL = 2;   // ek saath 2 emails
-  const DELAY_MS = 200; // batch ke beech 200ms
+  const PARALLEL = 2;
+  const DELAY_MS = 500; // 500ms — fast + safe balance
 
   for (let i = 0; i < emails.length; i += PARALLEL) {
     const batch = emails.slice(i, i + PARALLEL);
@@ -116,8 +115,7 @@ async function sendAll() {
               gmailId,
               appPassword,
               subject,
-              // ✅ Message bilkul same — koi Hi Name nahi, jo likha wahi jayega
-              messageBody,
+              messageBody, // ✅ exactly same — koi change nahi
               to
             })
           });
