@@ -95,43 +95,36 @@ async function sendAll() {
   setProgress(0, emails.length);
 
   let successCount = 0;
-  let failCount    = 0;
-  let completed    = 0;
+  let failCount = 0;
 
-  // ✅ One by one — safest for inbox
-  // Random delay 500-600ms — bilkul human jaisa pattern
-  for (let i = 0; i < emails.length; i++) {
-    try {
-      const res = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          senderName,
-          gmailId,
-          appPassword,
-          subject,
-          messageBody,
-          to: emails[i]
-        })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        successCount++;
-      } else {
-        failCount++;
-      }
-    } catch {
-      failCount++;
-    }
+  // ✅ 2 parallel + 600ms — best inbox + speed combo
+  const BATCH = 2;
+  let completed = 0;
 
-    completed++;
+  for (let i = 0; i < emails.length; i += BATCH) {
+    const batch = emails.slice(i, i + BATCH);
+
+    const results = await Promise.all(
+      batch.map(async (to) => {
+        try {
+          const res = await fetch('/api/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senderName, gmailId, appPassword, subject, messageBody, to })
+          });
+          const data = await res.json();
+          return res.ok && data.success ? 'ok' : 'fail';
+        } catch {
+          return 'fail';
+        }
+      })
+    );
+
+    results.forEach(r => r === 'ok' ? successCount++ : failCount++);
+    completed += batch.length;
     setProgress(completed, emails.length);
 
-    // ✅ Random 500-600ms — spam filter ko lagta hai human bhej raha hai
-    if (i < emails.length - 1) {
-      const delay = Math.floor(Math.random() * 500) + 600;
-      await sleep(delay);
-    }
+    if (i + BATCH < emails.length) await sleep(600);
   }
 
   if (failCount === 0) {
