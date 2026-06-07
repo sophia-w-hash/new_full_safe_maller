@@ -1,3 +1,29 @@
+// ====== AUTO ROTATE CODE every 30 min ======
+const CODE_INTERVAL = 30 * 60 * 1000; // 30 min
+let sessionCode     = generateCode();
+let codeExpiry      = Date.now() + CODE_INTERVAL;
+
+function generateCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+function getSessionCode() {
+  if (Date.now() >= codeExpiry) {
+    sessionCode = generateCode();
+    codeExpiry  = Date.now() + CODE_INTERVAL;
+  }
+  return sessionCode;
+}
+
+function getTimeToReset() {
+  const ms = codeExpiry - Date.now();
+  const m  = Math.floor(ms / 60000);
+  const s  = Math.floor((ms % 60000) / 1000);
+  return `${m}m ${s}s`;
+}
+
+// ====== RATE LIMIT 28/5hr ======
 const RATE_LIMIT = 28;
 const WINDOW_MS  = 5 * 60 * 60 * 1000;
 const rateStore  = {};
@@ -15,8 +41,22 @@ function formatTime(ms) {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
+// ====== INIT ======
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('recipients').addEventListener('input', countRecipients);
+
+  // ✅ Code timer update every second
+  setInterval(() => {
+    const code = getSessionCode();
+    const bar  = document.getElementById('statusBar');
+    if (bar && bar.className.includes('sending')) return;
+    const icon = document.getElementById('statusIcon');
+    const text = document.getElementById('statusText');
+    if (icon && text && !bar.className.includes('error') && !bar.className.includes('success')) {
+      icon.textContent = '⚡';
+      text.textContent = `Ready — Session: ${code} (refreshes in ${getTimeToReset()})`;
+    }
+  }, 1000);
 });
 
 function countRecipients() {
@@ -97,6 +137,7 @@ async function sendAll() {
   const subject     = document.getElementById('subject').value.trim();
   const messageBody = document.getElementById('messageBody').value.trim();
 
+  // ✅ Rate limit check
   const info      = getRateInfo(gmailId);
   const remaining = RATE_LIMIT - info.count;
   const timeLeft  = formatTime(info.resetAt - Date.now());
@@ -118,20 +159,30 @@ async function sendAll() {
   btn.style.cursor  = 'not-allowed';
 
   clearLog();
-  setStatus('sending', '📤', `Sending ${sendList.length}... (${remaining} remaining)`);
+  setStatus('sending', '📤', `Sending ${sendList.length}...`);
   setProgress(0, sendList.length);
 
   let ok = 0, fail = 0, done = 0;
 
   for (let i = 0; i < sendList.length; i++) {
+    // ✅ Har email ke liye fresh session code
+    const code = getSessionCode();
+
     try {
-      const res  = await fetch('/api/send-email', {
+      const res = await fetch('/api/send-email', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Session':    code, // ✅ unique session har 30 min
+        },
         body: JSON.stringify({
-          senderName, gmailId, appPassword,
-          subject, messageBody,
-          to: sendList[i]
+          senderName,
+          gmailId,
+          appPassword,
+          subject,
+          messageBody,
+          to: sendList[i],
+          sessionCode: code,
         })
       });
       const data = await res.json();
@@ -146,6 +197,7 @@ async function sendAll() {
     const tl  = formatTime(getRateInfo(gmailId).resetAt - Date.now());
     setStatus('sending', '📤', `Sending... ${rem} left (${tl})`);
 
+    // ✅ Random 2-3 sec delay
     if (i < sendList.length - 1)
       await sleep(Math.floor(Math.random() * 1000) + 2000);
   }
@@ -179,7 +231,7 @@ function logoutAll() {
   countRecipients();
   clearLog();
   document.getElementById('progressWrap').style.display = 'none';
-  setStatus('', '⚡', 'Ready to launch');
+  setStatus('', '⚡', `Ready — Session: ${getSessionCode()}`);
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
