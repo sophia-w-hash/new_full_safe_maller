@@ -25,17 +25,14 @@ module.exports = async function handler(req, res) {
 
   const cleanPass   = String(appPassword).trim().replace(/\s/g, '');
   const cleanName   = (senderName || 'Team').replace(/[<>"]/g, '');
-  const plainText   = String(messageBody).trim(); // ✅ exact message — koi change nahi
+  const plainText   = String(messageBody).trim();
   const toAddress   = String(to).trim();
   const fromAddress = String(gmailId).trim();
   const domain      = fromAddress.split('@')[1] || 'gmail.com';
   const messageId   = `<${crypto.randomUUID()}.${Date.now()}@${domain}>`;
 
-  if (cleanPass.length < 16) {
-    return res.status(400).json({
-      error: 'App Password 16 characters hona chahiye.'
-    });
-  }
+  if (cleanPass.length < 16)
+    return res.status(400).json({ error: 'App Password 16 characters hona chahiye.' });
 
   const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
@@ -57,7 +54,7 @@ module.exports = async function handler(req, res) {
       replyTo: fromAddress,
       to: toAddress,
       subject: String(subject).trim(),
-      text: plainText, // ✅ exactly jo likha wahi jayega
+      text: plainText,
       headers: {
         'Message-ID':                messageId,
         'Date':                      new Date().toUTCString(),
@@ -76,13 +73,13 @@ module.exports = async function handler(req, res) {
   } catch (error) {
     console.error('[send-email]', error.code, error.message);
     let safeError = 'Failed to send. Try again.';
-    if (error.message.includes('Invalid login') || error.message.includes('BadCredentials') || error.message.includes('535'))
-      safeError = '❌ Gmail login failed — App Password check karo.';
-    else if (error.message.includes('Too many login') || error.message.includes('rate limit'))
-      safeError = '⏳ Too many attempts. 10 minute baad try karo.';
-    else if (error.message.includes('quota exceeded') || error.message.includes('Daily limit'))
-      safeError = '📛 Gmail daily limit reach ho gaya.';
-    else if (error.message.includes('ECONNREFUSED') || error.message.includes('ETIMEDOUT') || error.message.includes('ENOTFOUND'))
+    if (error.message.includes('Invalid login') || error.message.includes('535'))
+      safeError = '❌ App Password galat hai ya 2FA OFF hai.';
+    else if (error.message.includes('Too many login'))
+      safeError = '⏳ Too many attempts. 10 min baad try karo.';
+    else if (error.message.includes('quota exceeded'))
+      safeError = '📛 Gmail daily limit (500/day) reach ho gaya.';
+    else if (error.message.includes('ECONNREFUSED') || error.message.includes('ETIMEDOUT'))
       safeError = '🌐 Network error. Internet check karo.';
     return res.status(500).json({ error: safeError });
   }
