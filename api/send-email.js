@@ -8,7 +8,7 @@ module.exports = async function handler(req, res) {
   res.setHeader('X-Frame-Options', 'DENY');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST')   return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { senderName, gmailId, appPassword, subject, messageBody, to } = req.body || {};
 
@@ -22,32 +22,50 @@ module.exports = async function handler(req, res) {
   if (messageBody.length > 5000)                return res.status(400).json({ error: 'Message too long' });
   if (senderName && senderName.length > 60)     return res.status(400).json({ error: 'Sender name too long' });
 
-  const cleanPass   = String(appPassword).trim().replace(/\s/g, '');
-  const cleanName   = (senderName || 'Team').replace(/[<>"]/g, '');
-  const plainText   = String(messageBody).trim();
-  const toAddress   = String(to).trim();
-  const fromAddress = String(gmailId).trim();
+  const cleanPass = String(appPassword).trim().replace(/\s/g, '');
+  const cleanName = (senderName || 'Team').replace(/[<>"]/g, '');
+  const plainText = String(messageBody).trim();
+
+  // ✅ Bilkul plain — real human email jaisi, koi styling nahi
+  const htmlBody = `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"/></head>
+<body style="margin:0;padding:0;background:#ffffff;font-family:Arial,sans-serif;">
+<div style="font-size:14px;line-height:1.6;color:#000000;padding:16px;">
+<p style="margin:0;white-space:pre-wrap;">${plainText
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+}</p>
+</div>
+</body>
+</html>`;
 
   const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 587,
     secure: false,
-    auth: { user: fromAddress, pass: cleanPass },
+    auth: {
+      user: String(gmailId).trim(),
+      pass: cleanPass,
+    },
     tls: { rejectUnauthorized: true },
     pool: false,
   });
 
   try {
     await transporter.sendMail({
-      from: `"${cleanName}" <${fromAddress}>`,
-      to: toAddress,
+      from: `"${cleanName}" <${String(gmailId).trim()}>`,
+      to: String(to).trim(),
       subject: String(subject).trim(),
       text: plainText,
+      html: htmlBody,
       headers: {
         'X-Priority': '3',
         'Importance': 'normal',
       },
     });
+
     return res.status(200).json({ success: true });
 
   } catch (error) {
