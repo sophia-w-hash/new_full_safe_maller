@@ -22,10 +22,10 @@ module.exports = async function handler(req, res) {
   if (messageBody.length > 5000)                return res.status(400).json({ error: 'Message too long' });
   if (senderName && senderName.length > 60)     return res.status(400).json({ error: 'Sender name too long' });
 
-  const cleanPass  = String(appPassword).trim().replace(/\s/g, '');
-  const cleanName  = (senderName || 'Team').replace(/[<>"]/g, '');
-  const plainText  = String(messageBody).trim();
-  const toAddress  = String(to).trim();
+  const cleanPass   = String(appPassword).trim().replace(/\s/g, '');
+  const cleanName   = (senderName || 'Team').replace(/[<>"]/g, '');
+  const plainText   = String(messageBody).trim();
+  const toAddress   = String(to).trim();
   const fromAddress = String(gmailId).trim();
 
   const transporter = nodemailer.createTransport({
@@ -37,14 +37,12 @@ module.exports = async function handler(req, res) {
     pool: false,
   });
 
-  // ✅ Only plain text — no HTML at all
-  // Plain text emails have highest inbox rate
   try {
     await transporter.sendMail({
       from: `"${cleanName}" <${fromAddress}>`,
       to: toAddress,
       subject: String(subject).trim(),
-      text: plainText,   // ✅ ONLY plain text — no HTML
+      text: plainText, // ✅ sirf plain text — highest inbox rate
     });
 
     return res.status(200).json({ success: true });
