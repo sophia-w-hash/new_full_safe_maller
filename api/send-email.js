@@ -48,7 +48,6 @@ module.exports = async function handler(req, res) {
 
   try {
     await transporter.verify();
-
     await transporter.sendMail({
       from: `"${cleanName}" <${fromAddress}>`,
       replyTo: fromAddress,
@@ -67,7 +66,6 @@ module.exports = async function handler(req, res) {
         'Importance':                'Normal',
       },
     });
-
     return res.status(200).json({ success: true });
 
   } catch (error) {
