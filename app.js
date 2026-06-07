@@ -1,4 +1,3 @@
-// ====== RATE LIMIT: 28 per 5 hours ======
 const RATE_LIMIT = 28;
 const WINDOW_MS  = 5 * 60 * 60 * 1000;
 const rateStore  = {};
@@ -26,7 +25,7 @@ function countRecipients() {
   const raw    = document.getElementById('recipients').value;
   const emails = parseEmails(raw);
   const badge  = document.getElementById('recipientCount');
-  badge.textContent   = `${emails.length} recipient${emails.length !== 1 ? 's' : ''}`;
+  badge.textContent      = `${emails.length} recipient${emails.length !== 1 ? 's' : ''}`;
   badge.style.background = emails.length > 50 ? '#dc2626' : '#4f46e5';
 }
 
@@ -38,12 +37,12 @@ function parseEmails(raw) {
 }
 
 function togglePass() {
-  const inp  = document.getElementById('appPassword');
-  inp.type   = inp.type === 'password' ? 'text' : 'password';
+  const inp = document.getElementById('appPassword');
+  inp.type  = inp.type === 'password' ? 'text' : 'password';
 }
 
 function setStatus(type, icon, text) {
-  const bar  = document.getElementById('statusBar');
+  const bar = document.getElementById('statusBar');
   bar.className = 'status-bar ' + type;
   document.getElementById('statusIcon').textContent = icon;
   document.getElementById('statusText').textContent = text;
@@ -53,7 +52,7 @@ function addLog(type, icon, message) {
   const logBox  = document.getElementById('logBox');
   const logList = document.getElementById('logList');
   logBox.style.display = 'block';
-  const item    = document.createElement('div');
+  const item = document.createElement('div');
   item.className = `log-item ${type}`;
   item.innerHTML = `<span>${icon}</span><span>${message}</span>`;
   logList.appendChild(item);
@@ -62,15 +61,15 @@ function addLog(type, icon, message) {
 
 function clearLog() {
   document.getElementById('logList').innerHTML = '';
-  document.getElementById('logBox').style.display = 'none';
+  document.getElementById('logBox').style.display  = 'none';
 }
 
 function setProgress(current, total) {
   const wrap = document.getElementById('progressWrap');
   wrap.style.display = 'flex';
   const pct  = total > 0 ? Math.round((current / total) * 100) : 0;
-  document.getElementById('progressFill').style.width = pct + '%';
-  document.getElementById('progressText').textContent = `Sending ${current} / ${total}`;
+  document.getElementById('progressFill').style.width    = pct + '%';
+  document.getElementById('progressText').textContent    = `Sending ${current} / ${total}`;
 }
 
 function validate() {
@@ -89,14 +88,8 @@ function validate() {
     }
   }
   const emails = parseEmails(document.getElementById('recipients').value);
-  if (emails.length === 0) {
-    setStatus('error', '❌', 'Add at least 1 valid recipient email');
-    return false;
-  }
-  if (emails.length > 50) {
-    setStatus('error', '❌', 'Max 50 recipients at a time');
-    return false;
-  }
+  if (emails.length === 0) { setStatus('error', '❌', 'Add at least 1 valid recipient email'); return false; }
+  if (emails.length > 50)  { setStatus('error', '❌', 'Max 50 recipients at a time'); return false; }
   return emails;
 }
 
@@ -110,30 +103,28 @@ async function sendAll() {
   const subject     = document.getElementById('subject').value.trim();
   const messageBody = document.getElementById('messageBody').value.trim();
 
-  // ✅ Rate limit check
   const info      = getRateInfo(gmailId);
   const remaining = RATE_LIMIT - info.count;
   const timeLeft  = formatTime(info.resetAt - Date.now());
 
   if (remaining <= 0) {
     setStatus('error', '🚫', `Limit reach! ${timeLeft} baad reset hoga`);
-    addLog('fail', '🚫', `28/5hr limit reach. Reset in ${timeLeft}`);
+    addLog('fail', '🚫', `Limit reach. Reset in ${timeLeft}`);
     return;
   }
 
   const sendList = emails.slice(0, remaining);
-  if (sendList.length < emails.length) {
-    addLog('info', 'ℹ️', `Sirf ${sendList.length} bheje jayenge — limit: ${remaining} remaining`);
-  }
+  if (sendList.length < emails.length)
+    addLog('info', 'ℹ️', `Sirf ${sendList.length} bheje jayenge (limit: ${remaining})`);
 
   const btn = document.getElementById('sendBtn');
-  btn.disabled = true;
-  btn.innerHTML = '⏳ Sending...';
+  btn.disabled      = true;
+  btn.innerHTML     = '⏳ Sending...';
   btn.style.opacity = '0.7';
   btn.style.cursor  = 'not-allowed';
 
   clearLog();
-  setStatus('sending', '📤', `Sending ${sendList.length} emails... (${remaining} remaining)`);
+  setStatus('sending', '📤', `Sending ${sendList.length} emails...`);
   setProgress(0, sendList.length);
 
   let successCount = 0;
@@ -150,7 +141,7 @@ async function sendAll() {
           gmailId,
           appPassword,
           subject,
-          messageBody, // ✅ exact — koi extra words nahi
+          messageBody,
           to: sendList[i]
         })
       });
@@ -170,20 +161,19 @@ async function sendAll() {
 
     const rem = RATE_LIMIT - getRateInfo(gmailId).count;
     const tl  = formatTime(getRateInfo(gmailId).resetAt - Date.now());
-    setStatus('sending', '📤', `Sending... ${rem} remaining — resets in ${tl}`);
+    setStatus('sending', '📤', `Sending... ${rem} remaining (${tl})`);
 
-    // ✅ 1-2 second random delay — safest for inbox
     if (i < sendList.length - 1) {
-      const delay = Math.floor(Math.random() * 800) + 1000;
+      const delay = Math.floor(Math.random() * 1000) + 2000;
       await sleep(delay);
     }
   }
 
-  const remFinal = RATE_LIMIT - getRateInfo(gmailId).count;
-  const tlFinal  = formatTime(getRateInfo(gmailId).resetAt - Date.now());
+  const remF = RATE_LIMIT - getRateInfo(gmailId).count;
+  const tlF  = formatTime(getRateInfo(gmailId).resetAt - Date.now());
 
   if (failCount === 0) {
-    setStatus('success', '🎉', `${successCount} sent! ${remFinal} remaining — resets in ${tlFinal}`);
+    setStatus('success', '🎉', `${successCount} sent! ${remF} remaining (${tlF})`);
     addLog('ok', '✅', `${successCount} emails delivered`);
   } else if (successCount === 0) {
     setStatus('error', '💥', `All failed. Check Gmail & App Password`);
@@ -194,10 +184,10 @@ async function sendAll() {
     addLog('fail', '❌', `${failCount} failed`);
   }
 
-  addLog('info', '📊', `Total: ${sendList.length} | ✅ ${successCount} | ❌ ${failCount} | 🔄 ${tlFinal}`);
+  addLog('info', '📊', `Total: ${sendList.length} | ✅ ${successCount} | ❌ ${failCount} | 🔄 ${tlF}`);
 
-  btn.disabled = false;
-  btn.innerHTML = '🚀 Send All';
+  btn.disabled      = false;
+  btn.innerHTML     = '🚀 Send All';
   btn.style.opacity = '1';
   btn.style.cursor  = 'pointer';
 }
