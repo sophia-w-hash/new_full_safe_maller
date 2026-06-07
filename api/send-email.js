@@ -31,6 +31,13 @@ module.exports = async function handler(req, res) {
   const domain      = fromAddress.split('@')[1] || 'gmail.com';
   const messageId   = `<${crypto.randomUUID()}.${Date.now()}@${domain}>`;
 
+  // ✅ App password length check
+  if (cleanPass.length < 16) {
+    return res.status(400).json({
+      error: 'App Password must be 16 characters. Get it from Google Account → Security → App Passwords.'
+    });
+  }
+
   const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 587,
@@ -44,6 +51,9 @@ module.exports = async function handler(req, res) {
   });
 
   try {
+    // ✅ Connection verify pehle
+    await transporter.verify();
+
     await transporter.sendMail({
       from: `"${cleanName}" <${fromAddress}>`,
       replyTo: fromAddress,
@@ -66,6 +76,27 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ success: true });
 
   } catch (error) {
+    console.error('[send-email]', error.code, error.message);
+
     let safeError = 'Failed to send. Try again.';
-    if (error.message.includes('Invalid login') || error.message.includes('BadCredentials'))
-      safeError = 'Invalid Gmai
+
+    if (
+      error.message.includes('Invalid login') ||
+      error.message.includes('BadCredentials') ||
+      error.message.includes('Username and Password') ||
+      error.message.includes('535')
+    ) {
+      safeError = '❌ Gmail login failed — App Password galat hai ya 2-Step Verification OFF hai.';
+    } else if (error.message.includes('Too many login') || error.message.includes('rate limit')) {
+      safeError = '⏳ Too many attempts. 10 minute baad try karo.';
+    } else if (error.message.includes('quota exceeded') || error.message.includes('Daily limit')) {
+      safeError = '📛 Gmail daily limit (500/day) reach ho gaya.';
+    } else if (error.message.includes('ECONNREFUSED') || error.message.includes('ETIMEDOUT') || error.message.includes('ENOTFOUND')) {
+      safeError = '🌐 Network error. Internet connection check karo.';
+    } else if (error.message.includes('certificate') || error.message.includes('TLS')) {
+      safeError = '🔒 SSL/TLS error. Try again.';
+    }
+
+    return res.status(500).json({ error: safeError });
+  }
+};
