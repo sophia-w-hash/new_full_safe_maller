@@ -1,3 +1,4 @@
+// ========== RECIPIENT COUNTER ==========
 function countRecipients() {
   const raw = document.getElementById('recipients').value;
   const emails = parseEmails(raw);
@@ -97,34 +98,27 @@ async function sendAll() {
   let successCount = 0;
   let failCount = 0;
 
-  // ✅ 2 parallel + 800ms gap — fastest inbox-safe combo
-  const BATCH = 2;
-  let completed = 0;
+  for (let i = 0; i < emails.length; i++) {
+    try {
+      const res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senderName, gmailId, appPassword, subject, messageBody, to: emails[i] })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    } catch (err) {
+      failCount++;
+    }
 
-  for (let i = 0; i < emails.length; i += BATCH) {
-    const batch = emails.slice(i, i + BATCH);
+    setProgress(i + 1, emails.length);
 
-    const results = await Promise.all(
-      batch.map(async (to) => {
-        try {
-          const res = await fetch('/api/send-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ senderName, gmailId, appPassword, subject, messageBody, to })
-          });
-          const data = await res.json();
-          return res.ok && data.success ? 'ok' : 'fail';
-        } catch {
-          return 'fail';
-        }
-      })
-    );
-
-    results.forEach(r => r === 'ok' ? successCount++ : failCount++);
-    completed += batch.length;
-    setProgress(completed, emails.length);
-
-    if (i + BATCH < emails.length) await sleep(800);
+    // ✅ 800ms — fastest safe limit for Gmail inbox delivery
+    if (i < emails.length - 1) await sleep(800);
   }
 
   if (failCount === 0) {
