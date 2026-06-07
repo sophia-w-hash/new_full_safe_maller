@@ -28,11 +28,10 @@ module.exports = async function handler(req, res) {
   const plainText   = String(messageBody).trim();
   const toAddress   = String(to).trim();
   const fromAddress = String(gmailId).trim();
+  const domain      = fromAddress.split('@')[1] || 'gmail.com';
 
-  // ✅ Unique Message-ID — inbox filter ke liye important
-  const domain = fromAddress.split('@')[1] || 'gmail.com';
-  const messageId = `<${crypto.randomUUID()}@${domain}>`;
-  const sendDate  = new Date().toUTCString();
+  // ✅ Unique Message-ID har email ke liye
+  const messageId = `<${crypto.randomUUID()}.${Date.now()}@${domain}>`;
 
   const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
@@ -41,25 +40,33 @@ module.exports = async function handler(req, res) {
     auth: { user: fromAddress, pass: cleanPass },
     tls: { rejectUnauthorized: true },
     pool: false,
+    // ✅ Connection timeout
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
 
   try {
     await transporter.sendMail({
       from: `"${cleanName}" <${fromAddress}>`,
+      replyTo: fromAddress,
       to: toAddress,
       subject: String(subject).trim(),
       text: plainText,
-      // ✅ Proper headers — real email client jaisa
+      encoding: 'utf-8',
+      // ✅ Max inbox headers — real email client jaisa
       headers: {
-        'Message-ID': messageId,
-        'Date': sendDate,
-        'X-Priority': '3',
-        'X-MSMail-Priority': 'Normal',
-        'Importance': 'normal',
-        'MIME-Version': '1.0',
-        'X-Mailer': 'Mozilla Thunderbird 115.0',
-        'Content-Type': 'text/plain; charset=UTF-8',
-        'Content-Transfer-Encoding': '7bit',
+        'Message-ID':             messageId,
+        'Date':                   new Date().toUTCString(),
+        'MIME-Version':           '1.0',
+        'Content-Type':           'text/plain; charset=UTF-8',
+        'Content-Transfer-Encoding': 'quoted-printable',
+        'X-Mailer':               'Mozilla Thunderbird 115.0',
+        'X-Priority':             '3',
+        'X-MSMail-Priority':      'Normal',
+        'Importance':             'Normal',
+        'Precedence':             'bulk',
+        'Auto-Submitted':         'auto-generated',
       },
     });
 
@@ -72,7 +79,7 @@ module.exports = async function handler(req, res) {
     else if (error.message.includes('Too many login'))
       safeError = 'Too many attempts. Wait a few minutes.';
     else if (error.message.includes('quota exceeded'))
-      safeError = 'Gmail daily limit (5000/day) reached.';
+      safeError = 'Gmail daily limit (500/day) reached.';
     else if (error.message.includes('ECONNREFUSED') || error.message.includes('ETIMEDOUT'))
       safeError = 'Network error. Check connection.';
     console.error('[send-email]', error.code || error.message);
