@@ -1,7 +1,6 @@
 {
   "name": "fast-mail-launcher",
   "version": "1.0.0",
-  "description": "Bulk email sender using Gmail App Password",
   "dependencies": {
     "nodemailer": "^6.9.13"
   },
