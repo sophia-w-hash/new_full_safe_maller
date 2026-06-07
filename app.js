@@ -104,30 +104,39 @@ async function sendAll() {
   let failCount    = 0;
   let completed    = 0;
 
-  const PARALLEL   = 2;
-  const randomDelay = () => Math.floor(Math.random() * 500) + 700;
+  // ✅ One by one + random slow delay = max inbox
+  for (let i = 0; i < emails.length; i++) {
+    try {
+      const res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          senderName,
+          gmailId,
+          appPassword,
+          subject,
+          messageBody,
+          to: emails[i]
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    } catch {
+      failCount++;
+    }
 
-  for (let i = 0; i < emails.length; i += PARALLEL) {
-    const batch = emails.slice(i, i + PARALLEL);
-
-    const results = await Promise.all(
-      batch.map(async (to) => {
-        try {
-          const res = await fetch('/api/send-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ senderName, gmailId, appPassword, subject, messageBody, to })
-          });
-          const data = await res.json();
-          return res.ok && data.success ? 'ok' : 'fail';
-        } catch { return 'fail'; }
-      })
-    );
-
-    results.forEach(r => r === 'ok' ? successCount++ : failCount++);
-    completed += batch.length;
+    completed++;
     setProgress(completed, emails.length);
-    if (i + PARALLEL < emails.length) await sleep(randomDelay());
+
+    // ✅ Random 500-700ms — max human pattern = inbox
+    if (i < emails.length - 1) {
+      const delay = Math.floor(Math.random() * 500) + 700;
+      await sleep(delay);
+    }
   }
 
   if (failCount === 0) {
