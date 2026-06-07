@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -12,68 +13,72 @@ module.exports = async function handler(req, res) {
 
   const { senderName, gmailId, appPassword, subject, messageBody, to } = req.body || {};
 
-  if (!gmailId || !appPassword || !subject || !messageBody || !to) {
+  if (!gmailId || !appPassword || !subject || !messageBody || !to)
     return res.status(400).json({ error: 'Missing required fields' });
-  }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(String(to).trim()))     return res.status(400).json({ error: 'Invalid recipient email' });
-  if (!emailRegex.test(String(gmailId).trim())) return res.status(400).json({ error: 'Invalid Gmail address' });
-
+  if (!emailRegex.test(String(to).trim()))      return res.status(400).json({ error: 'Invalid recipient' });
+  if (!emailRegex.test(String(gmailId).trim())) return res.status(400).json({ error: 'Invalid Gmail' });
   if (subject.length > 200)      return res.status(400).json({ error: 'Subject too long' });
-  if (messageBody.length > 5000) return res.status(400).json({ error: 'Message too long (max 5000 chars)' });
-  if (senderName && senderName.length > 60) return res.status(400).json({ error: 'Sender name too long' });
+  if (messageBody.length > 5000) return res.status(400).json({ error: 'Message too long' });
+  if (senderName && senderName.length > 60) return res.status(400).json({ error: 'Name too long' });
 
-  const cleanPass = String(appPassword).trim().replace(/\s/g, '');
+  const cleanPass   = String(appPassword).trim().replace(/\s/g, '');
+  const cleanName   = (senderName || 'Team').replace(/[<>"]/g, '');
+  const plainText   = String(messageBody).trim();
+  const toAddress   = String(to).trim();
+  const fromAddress = String(gmailId).trim();
+  const domain      = fromAddress.split('@')[1] || 'gmail.com';
+  const messageId   = `<${crypto.randomUUID()}.${Date.now()}@${domain}>`;
+
+  if (cleanPass.length < 16)
+    return res.status(400).json({ error: 'App Password 16 characters hona chahiye.' });
 
   const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: String(gmailId).trim(),
-      pass: cleanPass,
-    },
-    tls: { rejectUnauthorized: true }
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
+    auth: { user: fromAddress, pass: cleanPass },
+    tls: { rejectUnauthorized: true },
+    pool: false,
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
 
   try {
+    await transporter.verify();
     await transporter.sendMail({
-      from: `"${(senderName || 'Fast Mail Launcher').replace(/[<>"]/g, '')}" <${String(gmailId).trim()}>`,
-      to: String(to).trim(),
+      from: `"${cleanName}" <${fromAddress}>`,
+      replyTo: fromAddress,
+      to: toAddress,
       subject: String(subject).trim(),
-      text: String(messageBody).trim(),
-      html: `
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">
-          <div style="white-space:pre-wrap;line-height:1.7;color:#222;font-size:15px;">
-            ${String(messageBody).trim()
-              .replace(/&/g,'&amp;')
-              .replace(/</g,'&lt;')
-              .replace(/>/g,'&gt;')
-              .replace(/\n/g,'<br/>')}
-          </div>
-          <hr style="margin-top:32px;border:none;border-top:1px solid #eee;"/>
-          <p style="font-size:11px;color:#bbb;margin-top:8px;">Sent via Fast Mail Launcher</p>
-        </div>
-      `,
+      text: plainText,
+      headers: {
+        'Message-ID':                messageId,
+        'Date':                      new Date().toUTCString(),
+        'MIME-Version':              '1.0',
+        'Content-Type':              'text/plain; charset=UTF-8',
+        'Content-Transfer-Encoding': 'quoted-printable',
+        'X-Mailer':                  'Mozilla Thunderbird 115.0',
+        'X-Priority':                '3',
+        'X-MSMail-Priority':         'Normal',
+        'Importance':                'Normal',
+      },
     });
-
     return res.status(200).json({ success: true });
 
   } catch (error) {
-    let safeError = 'Failed to send email. Please try again.';
-
-    if (error.message) {
-      if (error.message.includes('Invalid login') || error.message.includes('Username and Password') || error.message.includes('BadCredentials')) {
-        safeError = 'Invalid Gmail or App Password. Make sure 2-Step Verification is ON.';
-      } else if (error.message.includes('Too many login')) {
-        safeError = 'Too many attempts. Please wait a few minutes.';
-      } else if (error.message.includes('ECONNREFUSED') || error.message.includes('ETIMEDOUT') || error.message.includes('ENOTFOUND')) {
-        safeError = 'Network error. Check your connection.';
-      } else if (error.message.includes('Daily user sending quota exceeded')) {
-        safeError = 'Gmail daily limit reached (500/day). Try again tomorrow.';
-      }
-    }
-
-    console.error('[send-email] Error:', error.code || error.message);
+    console.error('[send-email]', error.code, error.message);
+    let safeError = 'Failed to send. Try again.';
+    if (error.message.includes('Invalid login') || error.message.includes('535'))
+      safeError = '❌ App Password galat hai ya 2FA OFF hai.';
+    else if (error.message.includes('Too many login'))
+      safeError = '⏳ 10 minute baad try karo.';
+    else if (error.message.includes('quota exceeded'))
+      safeError = '📛 Daily limit reach ho gaya.';
+    else if (error.message.includes('ECONNREFUSED') || error.message.includes('ETIMEDOUT'))
+      safeError = '🌐 Network error.';
     return res.status(500).json({ error: safeError });
   }
 };
