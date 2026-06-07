@@ -1,7 +1,7 @@
-// ✅ Rate limit — 28 emails per 5 hours per Gmail ID
-const RATE_LIMIT   = 28;
-const WINDOW_MS    = 5 * 60 * 60 * 1000; // 5 hours
-const rateStore    = {}; // { gmailId: { count, resetAt } }
+// ====== RATE LIMIT: 28 per 5 hours ======
+const RATE_LIMIT = 28;
+const WINDOW_MS  = 5 * 60 * 60 * 1000;
+const rateStore  = {};
 
 function getRateInfo(gmailId) {
   const now = Date.now();
@@ -11,21 +11,6 @@ function getRateInfo(gmailId) {
   return rateStore[gmailId];
 }
 
-function checkRate(gmailId, needed) {
-  const info = getRateInfo(gmailId);
-  if (info.count + needed > RATE_LIMIT) {
-    const left = Math.ceil((info.resetAt - Date.now()) / 60000);
-    return { ok: false, left, remaining: RATE_LIMIT - info.count };
-  }
-  return { ok: true, remaining: RATE_LIMIT - info.count };
-}
-
-function useRate(gmailId, count = 1) {
-  const info = getRateInfo(gmailId);
-  info.count += count;
-}
-
-// ✅ Format time remaining
 function formatTime(ms) {
   const h = Math.floor(ms / 3600000);
   const m = Math.floor((ms % 3600000) / 60000);
@@ -38,10 +23,10 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 function countRecipients() {
-  const raw = document.getElementById('recipients').value;
+  const raw    = document.getElementById('recipients').value;
   const emails = parseEmails(raw);
-  const badge = document.getElementById('recipientCount');
-  badge.textContent = `${emails.length} recipient${emails.length !== 1 ? 's' : ''}`;
+  const badge  = document.getElementById('recipientCount');
+  badge.textContent   = `${emails.length} recipient${emails.length !== 1 ? 's' : ''}`;
   badge.style.background = emails.length > 50 ? '#dc2626' : '#4f46e5';
 }
 
@@ -53,22 +38,22 @@ function parseEmails(raw) {
 }
 
 function togglePass() {
-  const inp = document.getElementById('appPassword');
-  inp.type = inp.type === 'password' ? 'text' : 'password';
+  const inp  = document.getElementById('appPassword');
+  inp.type   = inp.type === 'password' ? 'text' : 'password';
 }
 
 function setStatus(type, icon, text) {
-  const bar = document.getElementById('statusBar');
+  const bar  = document.getElementById('statusBar');
   bar.className = 'status-bar ' + type;
   document.getElementById('statusIcon').textContent = icon;
   document.getElementById('statusText').textContent = text;
 }
 
 function addLog(type, icon, message) {
-  const logBox = document.getElementById('logBox');
+  const logBox  = document.getElementById('logBox');
   const logList = document.getElementById('logList');
   logBox.style.display = 'block';
-  const item = document.createElement('div');
+  const item    = document.createElement('div');
   item.className = `log-item ${type}`;
   item.innerHTML = `<span>${icon}</span><span>${message}</span>`;
   logList.appendChild(item);
@@ -83,7 +68,7 @@ function clearLog() {
 function setProgress(current, total) {
   const wrap = document.getElementById('progressWrap');
   wrap.style.display = 'flex';
-  const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+  const pct  = total > 0 ? Math.round((current / total) * 100) : 0;
   document.getElementById('progressFill').style.width = pct + '%';
   document.getElementById('progressText').textContent = `Sending ${current} / ${total}`;
 }
@@ -126,31 +111,29 @@ async function sendAll() {
   const messageBody = document.getElementById('messageBody').value.trim();
 
   // ✅ Rate limit check
-  const rateCheck = checkRate(gmailId, emails.length);
-  if (!rateCheck.ok) {
-    const timeLeft = formatTime(rateStore[gmailId].resetAt - Date.now());
-    setStatus('error', '🚫', `Limit reached! ${rateCheck.remaining} remaining. Resets in ${timeLeft}`);
-    addLog('fail', '🚫', `28/5hr limit reached. ${timeLeft} baad reset hoga.`);
+  const info      = getRateInfo(gmailId);
+  const remaining = RATE_LIMIT - info.count;
+  const timeLeft  = formatTime(info.resetAt - Date.now());
+
+  if (remaining <= 0) {
+    setStatus('error', '🚫', `Limit reach! ${timeLeft} baad reset hoga`);
+    addLog('fail', '🚫', `28/5hr limit reach. Reset in ${timeLeft}`);
     return;
   }
 
-  // ✅ Agar emails zyada hain to sirf remaining tak bhejo
-  const info = getRateInfo(gmailId);
-  const canSend = Math.min(emails.length, RATE_LIMIT - info.count);
-  const sendList = emails.slice(0, canSend);
-
-  if (canSend < emails.length) {
-    addLog('info', 'ℹ️', `Sirf ${canSend} bheje ja sakte hain — limit ke baad baki skip honge`);
+  const sendList = emails.slice(0, remaining);
+  if (sendList.length < emails.length) {
+    addLog('info', 'ℹ️', `Sirf ${sendList.length} bheje jayenge — limit: ${remaining} remaining`);
   }
 
   const btn = document.getElementById('sendBtn');
   btn.disabled = true;
   btn.innerHTML = '⏳ Sending...';
   btn.style.opacity = '0.7';
-  btn.style.cursor = 'not-allowed';
+  btn.style.cursor  = 'not-allowed';
 
   clearLog();
-  setStatus('sending', '📤', `Sending to ${sendList.length} recipients...`);
+  setStatus('sending', '📤', `Sending ${sendList.length} emails... (${remaining} remaining)`);
   setProgress(0, sendList.length);
 
   let successCount = 0;
@@ -167,14 +150,14 @@ async function sendAll() {
           gmailId,
           appPassword,
           subject,
-          messageBody, // ✅ exact message — koi extra words nahi
+          messageBody, // ✅ exact — koi extra words nahi
           to: sendList[i]
         })
       });
       const data = await res.json();
       if (res.ok && data.success) {
         successCount++;
-        useRate(gmailId); // ✅ rate count update
+        info.count++;
       } else {
         failCount++;
       }
@@ -185,38 +168,38 @@ async function sendAll() {
     completed++;
     setProgress(completed, sendList.length);
 
-    // ✅ Rate info update in status
-    const remaining = RATE_LIMIT - getRateInfo(gmailId).count;
-    const timeLeft  = formatTime(getRateInfo(gmailId).resetAt - Date.now());
-    setStatus('sending', '📤', `Sending... ${remaining} remaining (resets in ${timeLeft})`);
+    const rem = RATE_LIMIT - getRateInfo(gmailId).count;
+    const tl  = formatTime(getRateInfo(gmailId).resetAt - Date.now());
+    setStatus('sending', '📤', `Sending... ${rem} remaining — resets in ${tl}`);
 
+    // ✅ 1-2 second random delay — safest for inbox
     if (i < sendList.length - 1) {
-      const delay = Math.floor(Math.random() * 600) + 800; // 1.0-1.2s
+      const delay = Math.floor(Math.random() * 800) + 1000;
       await sleep(delay);
     }
   }
 
-  const remaining = RATE_LIMIT - getRateInfo(gmailId).count;
-  const timeLeft  = formatTime(getRateInfo(gmailId).resetAt - Date.now());
+  const remFinal = RATE_LIMIT - getRateInfo(gmailId).count;
+  const tlFinal  = formatTime(getRateInfo(gmailId).resetAt - Date.now());
 
   if (failCount === 0) {
-    setStatus('success', '🎉', `All ${successCount} sent! ${remaining} remaining (resets in ${timeLeft})`);
+    setStatus('success', '🎉', `${successCount} sent! ${remFinal} remaining — resets in ${tlFinal}`);
     addLog('ok', '✅', `${successCount} emails delivered`);
   } else if (successCount === 0) {
-    setStatus('error', '💥', `All ${failCount} failed. Check credentials.`);
-    addLog('fail', '❌', `All ${failCount} failed — check Gmail & App Password`);
+    setStatus('error', '💥', `All failed. Check Gmail & App Password`);
+    addLog('fail', '❌', `All ${failCount} failed`);
   } else {
-    setStatus('sending', '⚠️', `${successCount} sent, ${failCount} failed. ${remaining} remaining`);
+    setStatus('sending', '⚠️', `${successCount} sent, ${failCount} failed`);
     addLog('ok', '✅', `${successCount} delivered`);
     addLog('fail', '❌', `${failCount} failed`);
   }
 
-  addLog('info', '📊', `Total: ${sendList.length} | ✅ ${successCount} | ❌ ${failCount} | 🔄 Resets in ${timeLeft}`);
+  addLog('info', '📊', `Total: ${sendList.length} | ✅ ${successCount} | ❌ ${failCount} | 🔄 ${tlFinal}`);
 
   btn.disabled = false;
   btn.innerHTML = '🚀 Send All';
   btn.style.opacity = '1';
-  btn.style.cursor = 'pointer';
+  btn.style.cursor  = 'pointer';
 }
 
 function logoutAll() {
