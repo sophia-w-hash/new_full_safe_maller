@@ -104,8 +104,8 @@ async function sendAll() {
   let failCount    = 0;
   let completed    = 0;
 
-  const PARALLEL = 2;
-  const randomDelay = () => Math.floor(Math.random() * 500) + 700; // 700-1200ms
+  const PARALLEL   = 2;
+  const randomDelay = () => Math.floor(Math.random() * 500) + 700;
 
   for (let i = 0; i < emails.length; i += PARALLEL) {
     const batch = emails.slice(i, i + PARALLEL);
@@ -116,27 +116,17 @@ async function sendAll() {
           const res = await fetch('/api/send-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              senderName,
-              gmailId,
-              appPassword,
-              subject,
-              messageBody,
-              to
-            })
+            body: JSON.stringify({ senderName, gmailId, appPassword, subject, messageBody, to })
           });
           const data = await res.json();
           return res.ok && data.success ? 'ok' : 'fail';
-        } catch {
-          return 'fail';
-        }
+        } catch { return 'fail'; }
       })
     );
 
     results.forEach(r => r === 'ok' ? successCount++ : failCount++);
     completed += batch.length;
     setProgress(completed, emails.length);
-
     if (i + PARALLEL < emails.length) await sleep(randomDelay());
   }
 
