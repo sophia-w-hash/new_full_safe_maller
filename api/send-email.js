@@ -76,11 +76,11 @@ module.exports = async function handler(req, res) {
     if (error.message.includes('Invalid login') || error.message.includes('535'))
       safeError = '❌ App Password galat hai ya 2FA OFF hai.';
     else if (error.message.includes('Too many login'))
-      safeError = '⏳ Too many attempts. 10 min baad try karo.';
+      safeError = '⏳ 10 minute baad try karo.';
     else if (error.message.includes('quota exceeded'))
-      safeError = '📛 Gmail daily limit (500/day) reach ho gaya.';
+      safeError = '📛 Daily limit reach ho gaya.';
     else if (error.message.includes('ECONNREFUSED') || error.message.includes('ETIMEDOUT'))
-      safeError = '🌐 Network error. Internet check karo.';
+      safeError = '🌐 Network error.';
     return res.status(500).json({ error: safeError });
   }
 };
