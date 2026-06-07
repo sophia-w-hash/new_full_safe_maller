@@ -1,3 +1,9 @@
+// Auto count on page load bhi
+document.addEventListener('DOMContentLoaded', function () {
+  const el = document.getElementById('recipients');
+  if (el) el.addEventListener('input', countRecipients);
+});
+
 function countRecipients() {
   const raw = document.getElementById('recipients').value;
   const emails = parseEmails(raw);
@@ -86,9 +92,12 @@ async function sendAll() {
   const subject     = document.getElementById('subject').value.trim();
   const messageBody = document.getElementById('messageBody').value.trim();
 
+  // ✅ Button disable + Sending text
   const btn = document.getElementById('sendBtn');
   btn.disabled = true;
-  btn.textContent = '⏳ Sending...';
+  btn.innerHTML = '⏳ Sending...';
+  btn.style.opacity = '0.7';
+  btn.style.cursor = 'not-allowed';
 
   clearLog();
   setStatus('sending', '📤', `Sending to ${emails.length} recipients...`);
@@ -103,11 +112,24 @@ async function sendAll() {
       const res = await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ senderName, gmailId, appPassword, subject, messageBody, to: emails[i] })
+        body: JSON.stringify({
+          senderName,
+          gmailId,
+          appPassword,
+          subject,
+          messageBody,
+          to: emails[i]
+        })
       });
       const data = await res.json();
-      if (res.ok && data.success) { successCount++; } else { failCount++; }
-    } catch { failCount++; }
+      if (res.ok && data.success) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    } catch {
+      failCount++;
+    }
 
     completed++;
     setProgress(completed, emails.length);
@@ -122,4 +144,30 @@ async function sendAll() {
     setStatus('success', '🎉', `All ${successCount} emails sent successfully!`);
     addLog('ok', '✅', `${successCount} emails delivered successfully`);
   } else if (successCount === 0) {
-    setStatus('error',
+    setStatus('error', '💥', `All ${failCount} emails failed. Check credentials.`);
+    addLog('fail', '❌', `All ${failCount} failed — check Gmail & App Password`);
+  } else {
+    setStatus('sending', '⚠️', `${successCount} sent, ${failCount} failed`);
+    addLog('ok', '✅', `${successCount} delivered`);
+    addLog('fail', '❌', `${failCount} failed`);
+  }
+
+  addLog('info', '📊', `Total: ${emails.length} | ✅ ${successCount} success  ❌ ${failCount} failed`);
+
+  // ✅ Button wapas enable
+  btn.disabled = false;
+  btn.innerHTML = '🚀 Send All';
+  btn.style.opacity = '1';
+  btn.style.cursor = 'pointer';
+}
+
+function logoutAll() {
+  ['senderName','gmailId','appPassword','subject','messageBody','recipients']
+    .forEach(id => document.getElementById(id).value = '');
+  countRecipients();
+  clearLog();
+  document.getElementById('progressWrap').style.display = 'none';
+  setStatus('', '⚡', 'Ready to launch');
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
