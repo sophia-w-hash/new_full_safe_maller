@@ -10,7 +10,6 @@
 <body>
   <div class="wrapper">
     <div class="card">
-
       <div class="card-header">
         <div class="logo-wrap">📧</div>
         <div>
@@ -18,12 +17,10 @@
           <p class="subtitle">Send bulk emails instantly with Gmail</p>
         </div>
       </div>
-
       <div class="status-bar" id="statusBar">
         <span id="statusIcon">⚡</span>
         <span id="statusText">Ready to launch</span>
       </div>
-
       <div class="form-grid">
         <div class="input-group">
           <label>Sender Name</label>
@@ -54,17 +51,15 @@
             <span class="badge" id="recipientCount">0 recipients</span>
           </label>
           <textarea id="recipients" rows="5"
-            placeholder="Enter emails separated by comma or newline&#10;example@gmail.com, another@yahoo.com&#10;&#10;Max 50 emails at a time"></textarea>
+            placeholder="Enter emails separated by comma or newline&#10;example@gmail.com&#10;&#10;Max 50 emails at a time"></textarea>
         </div>
       </div>
-
       <div class="progress-wrap" id="progressWrap" style="display:none">
         <div class="progress-track">
           <div class="progress-fill" id="progressFill"></div>
         </div>
         <span id="progressText">Sending 0 / 0</span>
       </div>
-
       <div class="log-box" id="logBox" style="display:none">
         <div class="log-header">
           <span>📋 Send Log</span>
@@ -72,7 +67,6 @@
         </div>
         <div id="logList"></div>
       </div>
-
       <div class="btn-row">
         <button class="btn-send" id="sendBtn" onclick="sendAll()" type="button">
           🚀 Send All
@@ -81,7 +75,6 @@
           🟠 Logout<br/><small>(double click)</small>
         </button>
       </div>
-
       <p class="footer-note">🔒 Credentials never stored — session only</p>
     </div>
   </div>
