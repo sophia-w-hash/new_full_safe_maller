@@ -97,7 +97,7 @@ async function sendAll() {
   let successCount = 0;
   let failCount = 0;
 
-  // ✅ 2 parallel + 600ms — best inbox + speed combo
+  // ✅ 2 parallel + 800ms gap — fastest inbox-safe combo
   const BATCH = 2;
   let completed = 0;
 
@@ -124,7 +124,7 @@ async function sendAll() {
     completed += batch.length;
     setProgress(completed, emails.length);
 
-    if (i + BATCH < emails.length) await sleep(600);
+    if (i + BATCH < emails.length) await sleep(800);
   }
 
   if (failCount === 0) {
