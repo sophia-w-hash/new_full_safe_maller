@@ -1,88 +1,172 @@
-const nodemailer = require('nodemailer');
-const crypto = require('crypto');
+document.addEventListener('DOMContentLoaded', function () {
+  document.getElementById('recipients').addEventListener('input', countRecipients);
+});
 
-module.exports = async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
+function countRecipients() {
+  const raw = document.getElementById('recipients').value;
+  const emails = parseEmails(raw);
+  const badge = document.getElementById('recipientCount');
+  badge.textContent = `${emails.length} recipient${emails.length !== 1 ? 's' : ''}`;
+  badge.style.background = emails.length > 50 ? '#dc2626' : '#4f46e5';
+}
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+function parseEmails(raw) {
+  return raw
+    .split(/[\n,]+/)
+    .map(e => e.trim().toLowerCase())
+    .filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+}
 
-  const { senderName, gmailId, appPassword, subject, messageBody, to } = req.body || {};
+function togglePass() {
+  const inp = document.getElementById('appPassword');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
 
-  if (!gmailId || !appPassword || !subject || !messageBody || !to)
-    return res.status(400).json({ error: 'Missing required fields' });
+function setStatus(type, icon, text) {
+  const bar = document.getElementById('statusBar');
+  bar.className = 'status-bar ' + type;
+  document.getElementById('statusIcon').textContent = icon;
+  document.getElementById('statusText').textContent = text;
+}
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(String(to).trim()))      return res.status(400).json({ error: 'Invalid recipient' });
-  if (!emailRegex.test(String(gmailId).trim())) return res.status(400).json({ error: 'Invalid Gmail' });
-  if (subject.length > 200)      return res.status(400).json({ error: 'Subject too long' });
-  if (messageBody.length > 5000) return res.status(400).json({ error: 'Message too long' });
-  if (senderName && senderName.length > 60) return res.status(400).json({ error: 'Name too long' });
+function addLog(type, icon, message) {
+  const logBox = document.getElementById('logBox');
+  const logList = document.getElementById('logList');
+  logBox.style.display = 'block';
+  const item = document.createElement('div');
+  item.className = `log-item ${type}`;
+  item.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+  logList.appendChild(item);
+  logBox.scrollTop = logBox.scrollHeight;
+}
 
-  const cleanPass   = String(appPassword).trim().replace(/\s/g, '');
-  const cleanName   = (senderName || 'Team').replace(/[<>"]/g, '');
-  const plainText   = String(messageBody).trim();
-  const toAddress   = String(to).trim();
-  const fromAddress = String(gmailId).trim();
-  const domain      = fromAddress.split('@')[1] || 'gmail.com';
+function clearLog() {
+  document.getElementById('logList').innerHTML = '';
+  document.getElementById('logBox').style.display = 'none';
+}
 
-  // ✅ Unique Message-ID har email ke liye
-  const messageId = `<${crypto.randomUUID()}.${Date.now()}@${domain}>`;
+function setProgress(current, total) {
+  const wrap = document.getElementById('progressWrap');
+  wrap.style.display = 'flex';
+  const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').textContent = `Sending ${current} / ${total}`;
+}
 
-  const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    auth: { user: fromAddress, pass: cleanPass },
-    tls: { rejectUnauthorized: true },
-    pool: false,
-    // ✅ Connection timeout
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
-  });
-
-  try {
-    await transporter.sendMail({
-      from: `"${cleanName}" <${fromAddress}>`,
-      replyTo: fromAddress,
-      to: toAddress,
-      subject: String(subject).trim(),
-      text: plainText,
-      encoding: 'utf-8',
-      // ✅ Max inbox headers — real email client jaisa
-      headers: {
-        'Message-ID':             messageId,
-        'Date':                   new Date().toUTCString(),
-        'MIME-Version':           '1.0',
-        'Content-Type':           'text/plain; charset=UTF-8',
-        'Content-Transfer-Encoding': 'quoted-printable',
-        'X-Mailer':               'Mozilla Thunderbird 115.0',
-        'X-Priority':             '3',
-        'X-MSMail-Priority':      'Normal',
-        'Importance':             'Normal',
-        'Precedence':             'bulk',
-        'Auto-Submitted':         'auto-generated',
-      },
-    });
-
-    return res.status(200).json({ success: true });
-
-  } catch (error) {
-    let safeError = 'Failed to send. Try again.';
-    if (error.message.includes('Invalid login') || error.message.includes('BadCredentials'))
-      safeError = 'Invalid Gmail or App Password. 2-Step Verification ON karo.';
-    else if (error.message.includes('Too many login'))
-      safeError = 'Too many attempts. Wait a few minutes.';
-    else if (error.message.includes('quota exceeded'))
-      safeError = 'Gmail daily limit (500/day) reached.';
-    else if (error.message.includes('ECONNREFUSED') || error.message.includes('ETIMEDOUT'))
-      safeError = 'Network error. Check connection.';
-    console.error('[send-email]', error.code || error.message);
-    return res.status(500).json({ error: safeError });
+function validate() {
+  const fields = [
+    { id: 'senderName',  label: 'Sender Name' },
+    { id: 'gmailId',     label: 'Gmail ID' },
+    { id: 'appPassword', label: 'App Password' },
+    { id: 'subject',     label: 'Subject' },
+    { id: 'messageBody', label: 'Message Body' },
+  ];
+  for (const f of fields) {
+    if (!document.getElementById(f.id).value.trim()) {
+      setStatus('error', '❌', `${f.label} is required`);
+      document.getElementById(f.id).focus();
+      return false;
+    }
   }
-};
+  const emails = parseEmails(document.getElementById('recipients').value);
+  if (emails.length === 0) {
+    setStatus('error', '❌', 'Add at least 1 valid recipient email');
+    return false;
+  }
+  if (emails.length > 50) {
+    setStatus('error', '❌', 'Max 50 recipients at a time');
+    return false;
+  }
+  return emails;
+}
+
+async function sendAll() {
+  const emails = validate();
+  if (!emails) return;
+
+  const senderName  = document.getElementById('senderName').value.trim();
+  const gmailId     = document.getElementById('gmailId').value.trim();
+  const appPassword = document.getElementById('appPassword').value.trim();
+  const subject     = document.getElementById('subject').value.trim();
+  const messageBody = document.getElementById('messageBody').value.trim();
+
+  const btn = document.getElementById('sendBtn');
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Sending...';
+  btn.style.opacity = '0.7';
+  btn.style.cursor = 'not-allowed';
+
+  clearLog();
+  setStatus('sending', '📤', `Sending to ${emails.length} recipients...`);
+  setProgress(0, emails.length);
+
+  let successCount = 0;
+  let failCount    = 0;
+  let completed    = 0;
+
+  const PARALLEL = 2;
+  const randomDelay = () => Math.floor(Math.random() * 500) + 700; // 700-1200ms
+
+  for (let i = 0; i < emails.length; i += PARALLEL) {
+    const batch = emails.slice(i, i + PARALLEL);
+
+    const results = await Promise.all(
+      batch.map(async (to) => {
+        try {
+          const res = await fetch('/api/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              senderName,
+              gmailId,
+              appPassword,
+              subject,
+              messageBody,
+              to
+            })
+          });
+          const data = await res.json();
+          return res.ok && data.success ? 'ok' : 'fail';
+        } catch {
+          return 'fail';
+        }
+      })
+    );
+
+    results.forEach(r => r === 'ok' ? successCount++ : failCount++);
+    completed += batch.length;
+    setProgress(completed, emails.length);
+
+    if (i + PARALLEL < emails.length) await sleep(randomDelay());
+  }
+
+  if (failCount === 0) {
+    setStatus('success', '🎉', `All ${successCount} emails sent successfully!`);
+    addLog('ok', '✅', `${successCount} emails delivered successfully`);
+  } else if (successCount === 0) {
+    setStatus('error', '💥', `All ${failCount} emails failed. Check credentials.`);
+    addLog('fail', '❌', `All ${failCount} failed — check Gmail & App Password`);
+  } else {
+    setStatus('sending', '⚠️', `${successCount} sent, ${failCount} failed`);
+    addLog('ok', '✅', `${successCount} delivered`);
+    addLog('fail', '❌', `${failCount} failed`);
+  }
+
+  addLog('info', '📊', `Total: ${emails.length} | ✅ ${successCount} success  ❌ ${failCount} failed`);
+
+  btn.disabled = false;
+  btn.innerHTML = '🚀 Send All';
+  btn.style.opacity = '1';
+  btn.style.cursor = 'pointer';
+}
+
+function logoutAll() {
+  ['senderName','gmailId','appPassword','subject','messageBody','recipients']
+    .forEach(id => document.getElementById(id).value = '');
+  countRecipients();
+  clearLog();
+  document.getElementById('progressWrap').style.display = 'none';
+  setStatus('', '⚡', 'Ready to launch');
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
