@@ -135,7 +135,7 @@ async function sendAll() {
     setProgress(completed, emails.length);
 
     if (i < emails.length - 1) {
-      const delay = Math.floor(Math.random() * 600) + 800;
+      const delay = Math.floor(Math.random() * 300) + 500;
       await sleep(delay);
     }
   }
