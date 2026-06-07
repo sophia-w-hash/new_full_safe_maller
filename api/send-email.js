@@ -29,7 +29,11 @@ module.exports = async function handler(req, res) {
   const toAddress   = String(to).trim();
   const fromAddress = String(gmailId).trim();
   const domain      = fromAddress.split('@')[1] || 'gmail.com';
+
+  // ✅ Har email ke liye unique headers
   const messageId   = `<${crypto.randomUUID()}.${Date.now()}@${domain}>`;
+  const boundary    = crypto.randomBytes(16).toString('hex');
+  const threadId    = crypto.randomBytes(8).toString('hex');
 
   if (cleanPass.length < 16)
     return res.status(400).json({ error: 'App Password 16 characters hona chahiye.' });
@@ -58,12 +62,13 @@ module.exports = async function handler(req, res) {
         'Message-ID':                messageId,
         'Date':                      new Date().toUTCString(),
         'MIME-Version':              '1.0',
-        'Content-Type':              'text/plain; charset=UTF-8',
+        'Content-Type':              `text/plain; charset=UTF-8; boundary="${boundary}"`,
         'Content-Transfer-Encoding': 'quoted-printable',
         'X-Mailer':                  'Mozilla Thunderbird 115.0',
         'X-Priority':                '3',
         'X-MSMail-Priority':         'Normal',
         'Importance':                'Normal',
+        'X-Thread-ID':               threadId,
       },
     });
     return res.status(200).json({ success: true });
