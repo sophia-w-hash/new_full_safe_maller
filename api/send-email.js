@@ -18,9 +18,9 @@ module.exports = async function handler(req, res) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(String(to).trim()))      return res.status(400).json({ error: 'Invalid recipient' });
   if (!emailRegex.test(String(gmailId).trim())) return res.status(400).json({ error: 'Invalid Gmail' });
-  if (subject.length > 200)                     return res.status(400).json({ error: 'Subject too long' });
-  if (messageBody.length > 5000)                return res.status(400).json({ error: 'Message too long' });
-  if (senderName && senderName.length > 60)     return res.status(400).json({ error: 'Name too long' });
+  if (subject.length > 200)      return res.status(400).json({ error: 'Subject too long' });
+  if (messageBody.length > 5000) return res.status(400).json({ error: 'Message too long' });
+  if (senderName && senderName.length > 60) return res.status(400).json({ error: 'Name too long' });
 
   const cleanPass   = String(appPassword).trim().replace(/\s/g, '');
   const cleanName   = (senderName || 'Team').replace(/[<>"]/g, '');
