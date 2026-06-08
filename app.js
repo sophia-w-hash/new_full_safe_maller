@@ -132,8 +132,9 @@ async function sendAll() {
 
   let ok = 0, fail = 0, done = 0;
 
+  // ✅ PARALLEL=2 + 1000-1500ms normal speed
   const PARALLEL = 2;
-  const DELAY    = () => Math.floor(Math.random() * 300) + 500;
+  const DELAY    = () => Math.floor(Math.random() * 500) + 1000;
 
   for (let i = 0; i < sendList.length; i += PARALLEL) {
     const batch = sendList.slice(i, i + PARALLEL);
