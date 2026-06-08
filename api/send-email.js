@@ -32,15 +32,9 @@ module.exports = async function handler(req, res) {
   if (cleanPass.length < 16)
     return res.status(400).json({ error: 'App Password 16 characters hona chahiye.' });
 
-  const mailers = [
-    'Apple Mail 16.0',
-    'Mozilla Thunderbird 115.0',
-    'Microsoft Outlook 16.0',
-    'Evolution 3.46',
-  ];
-  const randomMailer  = mailers[Math.floor(Math.random() * mailers.length)];
-  const invisibleChar = '\u200B'.repeat(Math.floor(Math.random() * 3) + 1);
-  const finalText     = plainText + invisibleChar;
+  const mailers = ['Apple Mail 16.0','Mozilla Thunderbird 115.0','Microsoft Outlook 16.0'];
+  const xMailer = mailers[Math.floor(Math.random() * mailers.length)];
+  const finalText = plainText + '\u200B'.repeat(Math.floor(Math.random() * 3) + 1);
 
   const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
@@ -67,12 +61,11 @@ module.exports = async function handler(req, res) {
         'MIME-Version':              '1.0',
         'Content-Type':              'text/plain; charset=UTF-8',
         'Content-Transfer-Encoding': '7bit',
-        'X-Mailer':                  randomMailer,
+        'X-Mailer':                  xMailer,
         'X-Priority':                '3',
         'Importance':                'Normal',
       },
     });
-
     return res.status(200).json({ success: true });
 
   } catch (error) {
