@@ -32,16 +32,13 @@ module.exports = async function handler(req, res) {
   if (cleanPass.length < 16)
     return res.status(400).json({ error: 'App Password 16 characters hona chahiye.' });
 
-  // ✅ Random mailer
   const mailers = [
     'Apple Mail 16.0',
     'Mozilla Thunderbird 115.0',
     'Microsoft Outlook 16.0',
     'Evolution 3.46',
   ];
-  const randomMailer = mailers[Math.floor(Math.random() * mailers.length)];
-
-  // ✅ Invisible unique char — har email alag fingerprint
+  const randomMailer  = mailers[Math.floor(Math.random() * mailers.length)];
   const invisibleChar = '\u200B'.repeat(Math.floor(Math.random() * 3) + 1);
   const finalText     = plainText + invisibleChar;
 
@@ -59,9 +56,7 @@ module.exports = async function handler(req, res) {
 
   try {
     await transporter.sendMail({
-      from: cleanName
-        ? `"${cleanName}" <${fromAddress}>`
-        : `<${fromAddress}>`,
+      from: cleanName ? `"${cleanName}" <${fromAddress}>` : `<${fromAddress}>`,
       replyTo: fromAddress,
       to: toAddress,
       subject: String(subject).trim(),
