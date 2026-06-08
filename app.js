@@ -87,12 +87,10 @@ function validate() {
   return emails;
 }
 
-function varySubject(subject) {
-  const spaces = [' ', ' \u200B', ' \u00A0'];
-  return subject.split(' ').map((word, i) =>
-    i === 0 ? word : (Math.random() > 0.7
-      ? spaces[Math.floor(Math.random() * spaces.length)]
-      : ' ') + word
+function varySubject(s) {
+  const sp = [' ', ' \u200B', ' \u00A0'];
+  return s.split(' ').map((w, i) =>
+    i === 0 ? w : (Math.random() > 0.7 ? sp[Math.floor(Math.random() * sp.length)] : ' ') + w
   ).join('');
 }
 
@@ -121,38 +119,26 @@ async function sendAll() {
     addLog('info', 'ℹ️', `${sendList.length} bheje jayenge (limit: ${remaining})`);
 
   const btn = document.getElementById('sendBtn');
-  btn.disabled      = true;
-  btn.innerHTML     = '⏳ Sending...';
-  btn.style.opacity = '0.7';
-  btn.style.cursor  = 'not-allowed';
+  btn.disabled = true; btn.innerHTML = '⏳ Sending...';
+  btn.style.opacity = '0.7'; btn.style.cursor = 'not-allowed';
 
   clearLog();
   setStatus('sending', '📤', `Sending ${sendList.length}...`);
   setProgress(0, sendList.length);
 
   let ok = 0, fail = 0, done = 0;
-
-  // ✅ PARALLEL=2 + 1000-1500ms normal speed
   const PARALLEL = 2;
   const DELAY    = () => Math.floor(Math.random() * 500) + 1000;
 
   for (let i = 0; i < sendList.length; i += PARALLEL) {
     const batch = sendList.slice(i, i + PARALLEL);
-
     const results = await Promise.all(
       batch.map(async (to) => {
         try {
           const res = await fetch('/api/send-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              senderName,
-              gmailId,
-              appPassword,
-              subject: varySubject(subject),
-              messageBody,
-              to
-            })
+            body: JSON.stringify({ senderName, gmailId, appPassword, subject: varySubject(subject), messageBody, to })
           });
           const data = await res.json();
           return res.ok && data.success ? 'ok' : 'fail';
@@ -160,11 +146,7 @@ async function sendAll() {
       })
     );
 
-    results.forEach(r => {
-      if (r === 'ok') { ok++; info.count++; }
-      else fail++;
-    });
-
+    results.forEach(r => { if (r === 'ok') { ok++; info.count++; } else fail++; });
     done += batch.length;
     setProgress(done, sendList.length);
 
@@ -192,17 +174,14 @@ async function sendAll() {
 
   addLog('info', '📊', `Total: ${sendList.length} | ✅ ${ok} | ❌ ${fail} | 🔄 ${tlF}`);
 
-  btn.disabled      = false;
-  btn.innerHTML     = '🚀 Send All';
-  btn.style.opacity = '1';
-  btn.style.cursor  = 'pointer';
+  btn.disabled = false; btn.innerHTML = '🚀 Send All';
+  btn.style.opacity = '1'; btn.style.cursor = 'pointer';
 }
 
 function logoutAll() {
   ['senderName','gmailId','appPassword','subject','messageBody','recipients']
     .forEach(id => document.getElementById(id).value = '');
-  countRecipients();
-  clearLog();
+  countRecipients(); clearLog();
   document.getElementById('progressWrap').style.display = 'none';
   setStatus('', '⚡', 'Ready to launch');
 }
