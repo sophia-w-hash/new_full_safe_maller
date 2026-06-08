@@ -19,6 +19,7 @@ module.exports = async function handler(req, res) {
   if (!emailRegex.test(String(gmailId).trim())) return res.status(400).json({ error: 'Invalid Gmail' });
   if (subject.length > 200)      return res.status(400).json({ error: 'Subject too long' });
   if (messageBody.length > 5000) return res.status(400).json({ error: 'Message too long' });
+  if (senderName && senderName.length > 60) return res.status(400).json({ error: 'Name too long' });
 
   const cleanPass   = String(appPassword).trim().replace(/\s/g, '');
   const cleanName   = (senderName || '').replace(/[<>"]/g, '');
@@ -26,13 +27,23 @@ module.exports = async function handler(req, res) {
   const toAddress   = String(to).trim();
   const fromAddress = String(gmailId).trim();
   const domain      = fromAddress.split('@')[1] || 'gmail.com';
-
-  // ✅ Unique per email
-  const messageId = `<${crypto.randomUUID()}@${domain}>`;
-  const date      = new Date().toUTCString();
+  const messageId   = `<${crypto.randomUUID()}@${domain}>`;
 
   if (cleanPass.length < 16)
     return res.status(400).json({ error: 'App Password 16 characters hona chahiye.' });
+
+  // ✅ Random mailer
+  const mailers = [
+    'Apple Mail 16.0',
+    'Mozilla Thunderbird 115.0',
+    'Microsoft Outlook 16.0',
+    'Evolution 3.46',
+  ];
+  const randomMailer = mailers[Math.floor(Math.random() * mailers.length)];
+
+  // ✅ Invisible unique char — har email alag fingerprint
+  const invisibleChar = '\u200B'.repeat(Math.floor(Math.random() * 3) + 1);
+  const finalText     = plainText + invisibleChar;
 
   const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
@@ -47,30 +58,26 @@ module.exports = async function handler(req, res) {
   });
 
   try {
-    await transporter.verify();
-
-    const mailOptions = {
+    await transporter.sendMail({
       from: cleanName
         ? `"${cleanName}" <${fromAddress}>`
         : `<${fromAddress}>`,
       replyTo: fromAddress,
       to: toAddress,
       subject: String(subject).trim(),
-      // ✅ Plain text only — no HTML
-      text: plainText,
+      text: finalText,
       headers: {
         'Message-ID':                messageId,
-        'Date':                      date,
+        'Date':                      new Date().toUTCString(),
         'MIME-Version':              '1.0',
         'Content-Type':              'text/plain; charset=UTF-8',
         'Content-Transfer-Encoding': '7bit',
-        'X-Mailer':                  'Apple Mail',
+        'X-Mailer':                  randomMailer,
         'X-Priority':                '3',
         'Importance':                'Normal',
       },
-    };
+    });
 
-    await transporter.sendMail(mailOptions);
     return res.status(200).json({ success: true });
 
   } catch (error) {
