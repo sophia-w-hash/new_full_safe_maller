@@ -87,14 +87,6 @@ function validate() {
   return emails;
 }
 
-// ✅ Subject mein tiny variation — spam filter bypass
-function varySubject(subject) {
-  const spaces = [' ', ' \u200B', ' \u00A0'];
-  return subject.split(' ').map((word, i) =>
-    i === 0 ? word : (Math.random() > 0.7 ? spaces[Math.floor(Math.random() * spaces.length)] : ' ') + word
-  ).join('');
-}
-
 async function sendAll() {
   const emails = validate();
   if (!emails) return;
@@ -140,7 +132,7 @@ async function sendAll() {
           senderName,
           gmailId,
           appPassword,
-          subject: varySubject(subject), // ✅ slight variation
+          subject,
           messageBody,
           to: sendList[i]
         })
@@ -157,9 +149,8 @@ async function sendAll() {
     const tl  = formatTime(getRateInfo(gmailId).resetAt - Date.now());
     setStatus('sending', '📤', `Sending... ${rem} left (${tl})`);
 
-    // ✅ Random 2-4 sec — human pattern
     if (i < sendList.length - 1)
-      await sleep(Math.floor(Math.random() * 2000) + 2000);
+      await sleep(Math.floor(Math.random() * 1000) + 2000);
   }
 
   const remF = RATE_LIMIT - getRateInfo(gmailId).count;
