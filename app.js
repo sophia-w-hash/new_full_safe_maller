@@ -131,8 +131,7 @@ async function sendAll() {
 
   let ok = 0, fail = 0, done = 0;
 
-  // ✅ PARALLEL = 1 + 500ms delay
-  const PARALLEL = 2;
+  // ✅ const PARALLEL = 2 + 500ms delay
   const DELAY_MS = () => Math.floor(Math.random() * 300) + 500;
 
   for (let i = 0; i < sendList.length; i += PARALLEL) {
