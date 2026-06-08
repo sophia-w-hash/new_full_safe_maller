@@ -87,6 +87,15 @@ function validate() {
   return emails;
 }
 
+function varySubject(subject) {
+  const spaces = [' ', ' \u200B', ' \u00A0'];
+  return subject.split(' ').map((word, i) =>
+    i === 0 ? word : (Math.random() > 0.7
+      ? spaces[Math.floor(Math.random() * spaces.length)]
+      : ' ') + word
+  ).join('');
+}
+
 async function sendAll() {
   const emails = validate();
   if (!emails) return;
@@ -123,34 +132,46 @@ async function sendAll() {
 
   let ok = 0, fail = 0, done = 0;
 
-  for (let i = 0; i < sendList.length; i++) {
-    try {
-      const res = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          senderName,
-          gmailId,
-          appPassword,
-          subject,
-          messageBody,
-          to: sendList[i]
-        })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) { ok++; info.count++; }
-      else fail++;
-    } catch { fail++; }
+  const PARALLEL = 2;
+  const DELAY    = () => Math.floor(Math.random() * 300) + 500;
 
-    done++;
+  for (let i = 0; i < sendList.length; i += PARALLEL) {
+    const batch = sendList.slice(i, i + PARALLEL);
+
+    const results = await Promise.all(
+      batch.map(async (to) => {
+        try {
+          const res = await fetch('/api/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              senderName,
+              gmailId,
+              appPassword,
+              subject: varySubject(subject),
+              messageBody,
+              to
+            })
+          });
+          const data = await res.json();
+          return res.ok && data.success ? 'ok' : 'fail';
+        } catch { return 'fail'; }
+      })
+    );
+
+    results.forEach(r => {
+      if (r === 'ok') { ok++; info.count++; }
+      else fail++;
+    });
+
+    done += batch.length;
     setProgress(done, sendList.length);
 
     const rem = RATE_LIMIT - getRateInfo(gmailId).count;
     const tl  = formatTime(getRateInfo(gmailId).resetAt - Date.now());
     setStatus('sending', '📤', `Sending... ${rem} left (${tl})`);
 
-    if (i < sendList.length - 1)
-      await sleep(Math.floor(Math.random() * 1000) + 2000);
+    if (i + PARALLEL < sendList.length) await sleep(DELAY());
   }
 
   const remF = RATE_LIMIT - getRateInfo(gmailId).count;
