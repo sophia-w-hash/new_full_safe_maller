@@ -1,16 +1,8 @@
 {
   "version": 2,
-  "builds": [
-    { "src": "api/send-email.js", "use": "@vercel/node" },
-    { "src": "index.html", "use": "@vercel/static" },
-    { "src": "style.css", "use": "@vercel/static" },
-    { "src": "app.js", "use": "@vercel/static" }
-  ],
-  "routes": [
-    { "src": "/api/send-email", "dest": "/api/send-email.js" },
-    { "src": "/(.*)", "dest": "/$1" }
-  ],
   "functions": {
-    "api/send-email.js": { "maxDuration": 30 }
+    "api/send-email.js": {
+      "maxDuration": 30
+    }
   }
 }
