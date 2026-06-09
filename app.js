@@ -76,11 +76,13 @@ function validate() {
   return emails;
 }
 
-// ✅ Recipient name extract karta hai email se — personal feel deta hai
+// ✅ john@gmail.com → "John"
+// wardexcavationllc@gmail.com → "Wardexcavationllc" → clean name
 function getFirstName(email) {
   const local = email.split('@')[0];
-  const name = local.split(/[.\-_]/)[0];
-  return name.charAt(0).toUpperCase() + name.slice(1);
+  const name = local.split(/[.\-_0-9]/)[0];
+  if (!name || name.length < 2) return '';
+  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
 }
 
 async function sendAll() {
@@ -105,14 +107,13 @@ async function sendAll() {
   let failCount = 0;
   let completed = 0;
 
-  // ✅ One by one — most inbox-friendly
-  // Har email ke liye random delay — human jaisa pattern
   for (let i = 0; i < emails.length; i++) {
     const to = emails[i];
 
-    // ✅ Personalized message — recipient ka naam add hota hai
+    // ✅ Auto name from email — john@gmail.com → "Hi John,"
     const firstName = getFirstName(to);
-    const personalBody = `Hi ${firstName},\n\n${messageBody}`;
+    const greeting = firstName ? `Hi ${firstName},\n\n` : `Hi,\n\n`;
+    const personalBody = greeting + messageBody;
 
     try {
       const res = await fetch('/api/send-email', {
@@ -140,7 +141,7 @@ async function sendAll() {
     completed++;
     setProgress(completed, emails.length);
 
-    // ✅ Random delay 700ms-1200ms — human pattern, spam filter bypass
+    // ✅ Random delay — human pattern, spam bypass
     if (i < emails.length - 1) {
       const delay = Math.floor(Math.random() * 500) + 700;
       await sleep(delay);
