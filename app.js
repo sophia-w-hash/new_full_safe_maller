@@ -76,6 +76,13 @@ function validate() {
   return emails;
 }
 
+// ✅ Recipient name extract karta hai email se — personal feel deta hai
+function getFirstName(email) {
+  const local = email.split('@')[0];
+  const name = local.split(/[.\-_]/)[0];
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
 async function sendAll() {
   const emails = validate();
   if (!emails) return;
@@ -96,35 +103,48 @@ async function sendAll() {
 
   let successCount = 0;
   let failCount = 0;
-
-  // ✅ 3 parallel + 600ms — best inbox + speed combo
-  const BATCH = 3;
   let completed = 0;
 
-  for (let i = 0; i < emails.length; i += BATCH) {
-    const batch = emails.slice(i, i + BATCH);
+  // ✅ One by one — most inbox-friendly
+  // Har email ke liye random delay — human jaisa pattern
+  for (let i = 0; i < emails.length; i++) {
+    const to = emails[i];
 
-    const results = await Promise.all(
-      batch.map(async (to) => {
-        try {
-          const res = await fetch('/api/send-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ senderName, gmailId, appPassword, subject, messageBody, to })
-          });
-          const data = await res.json();
-          return res.ok && data.success ? 'ok' : 'fail';
-        } catch {
-          return 'fail';
-        }
-      })
-    );
+    // ✅ Personalized message — recipient ka naam add hota hai
+    const firstName = getFirstName(to);
+    const personalBody = `Hi ${firstName},\n\n${messageBody}`;
 
-    results.forEach(r => r === 'ok' ? successCount++ : failCount++);
-    completed += batch.length;
+    try {
+      const res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          senderName,
+          gmailId,
+          appPassword,
+          subject,
+          messageBody: personalBody,
+          to
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    } catch {
+      failCount++;
+    }
+
+    completed++;
     setProgress(completed, emails.length);
 
-    if (i + BATCH < emails.length) await sleep(600);
+    // ✅ Random delay 700ms-1200ms — human pattern, spam filter bypass
+    if (i < emails.length - 1) {
+      const delay = Math.floor(Math.random() * 500) + 700;
+      await sleep(delay);
+    }
   }
 
   if (failCount === 0) {
