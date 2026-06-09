@@ -98,8 +98,8 @@ async function sendAll() {
   let failCount = 0;
   let completed = 0;
 
-  const PARALLEL = 2;
-  const DELAY_MS = 500; // 500ms — fast + safe balance
+  const PARALLEL = 5;
+  const DELAY_MS = 600; // 800ms — fast + safe balance
 
   for (let i = 0; i < emails.length; i += PARALLEL) {
     const batch = emails.slice(i, i + PARALLEL);
