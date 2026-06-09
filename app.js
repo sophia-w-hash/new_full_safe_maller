@@ -76,15 +76,6 @@ function validate() {
   return emails;
 }
 
-// ✅ john@gmail.com → "John"
-// wardexcavationllc@gmail.com → "Wardexcavationllc" → clean name
-function getFirstName(email) {
-  const local = email.split('@')[0];
-  const name = local.split(/[.\-_0-9]/)[0];
-  if (!name || name.length < 2) return '';
-  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-}
-
 async function sendAll() {
   const emails = validate();
   if (!emails) return;
@@ -107,45 +98,42 @@ async function sendAll() {
   let failCount = 0;
   let completed = 0;
 
-  for (let i = 0; i < emails.length; i++) {
-    const to = emails[i];
+  // ✅ Gmail safe limits
+  const PARALLEL = 2;   // ek saath 2 emails
+  const DELAY_MS = 200; // batch ke beech 200ms
 
-    // ✅ Auto name from email — john@gmail.com → "Hi John,"
-    const firstName = getFirstName(to);
-    const greeting = firstName ? `Hi ${firstName},\n\n` : `Hi,\n\n`;
-    const personalBody = greeting + messageBody;
+  for (let i = 0; i < emails.length; i += PARALLEL) {
+    const batch = emails.slice(i, i + PARALLEL);
 
-    try {
-      const res = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          senderName,
-          gmailId,
-          appPassword,
-          subject,
-          messageBody: personalBody,
-          to
-        })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        successCount++;
-      } else {
-        failCount++;
-      }
-    } catch {
-      failCount++;
-    }
+    const results = await Promise.all(
+      batch.map(async (to) => {
+        try {
+          const res = await fetch('/api/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              senderName,
+              gmailId,
+              appPassword,
+              subject,
+              // ✅ Message bilkul same — koi Hi Name nahi, jo likha wahi jayega
+              messageBody,
+              to
+            })
+          });
+          const data = await res.json();
+          return res.ok && data.success ? 'ok' : 'fail';
+        } catch {
+          return 'fail';
+        }
+      })
+    );
 
-    completed++;
+    results.forEach(r => r === 'ok' ? successCount++ : failCount++);
+    completed += batch.length;
     setProgress(completed, emails.length);
 
-    // ✅ Random delay — human pattern, spam bypass
-    if (i < emails.length - 1) {
-      const delay = Math.floor(Math.random() * 500) + 700;
-      await sleep(delay);
-    }
+    if (i + PARALLEL < emails.length) await sleep(DELAY_MS);
   }
 
   if (failCount === 0) {
