@@ -69,8 +69,8 @@ function validate() {
     setStatus('error', '❌', 'Add at least 1 valid recipient email');
     return false;
   }
-  if (emails.length > 50) {
-    setStatus('error', '❌', 'Max 50 recipients at a time');
+  if (emails.length > 30) {
+    setStatus('error', '❌', 'Max 30 recipients at a time');
     return false;
   }
   return emails;
@@ -98,8 +98,8 @@ async function sendAll() {
   let failCount = 0;
   let completed = 0;
 
-  const PARALLEL = 5;
-  const DELAY_MS = 600; // 800ms — fast + safe balance
+  const PARALLEL = 1;
+  const DELAY_MS = 800; // 1000ms — safe balance
 
   for (let i = 0; i < emails.length; i += PARALLEL) {
     const batch = emails.slice(i, i + PARALLEL);
