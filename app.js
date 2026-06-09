@@ -32,8 +32,7 @@ function addLog(type, icon, message) {
   logBox.style.display = 'block';
   const item = document.createElement('div');
   item.className = `log-item ${type}`;
-  const safe = String(message).replace(/pass(word)?[\s:=]+\S+/gi, '***');
-  item.innerHTML = `<span>${icon}</span><span>${safe}</span>`;
+  item.innerHTML = `<span>${icon}</span><span>${message}</span>`;
   logList.appendChild(item);
   logBox.scrollTop = logBox.scrollHeight;
 }
@@ -100,28 +99,20 @@ async function sendAll() {
   let failCount = 0;
 
   for (let i = 0; i < emails.length; i++) {
-    const to = emails[i];
-    const maskedTo = maskEmail(to);
-
     try {
       const res = await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ senderName, gmailId, appPassword, subject, messageBody, to })
+        body: JSON.stringify({ senderName, gmailId, appPassword, subject, messageBody, to: emails[i] })
       });
-
       const data = await res.json();
       if (res.ok && data.success) {
         successCount++;
-        addLog('ok', '✅', `Sent → ${maskedTo}`);
       } else {
         failCount++;
-        const safeError = sanitizeError(data.error || 'Unknown error');
-        addLog('fail', '❌', `Failed → ${maskedTo}: ${safeError}`);
       }
     } catch (err) {
       failCount++;
-      addLog('fail', '❌', `Error → ${maskedTo}: Network issue`);
     }
 
     setProgress(i + 1, emails.length);
@@ -130,30 +121,20 @@ async function sendAll() {
 
   if (failCount === 0) {
     setStatus('success', '🎉', `All ${successCount} emails sent successfully!`);
+    addLog('ok', '✅', `${successCount} emails delivered successfully`);
   } else if (successCount === 0) {
     setStatus('error', '💥', `All ${failCount} emails failed. Check credentials.`);
+    addLog('fail', '❌', `All ${failCount} emails failed — check Gmail & App Password`);
   } else {
     setStatus('sending', '⚠️', `${successCount} sent, ${failCount} failed`);
+    addLog('ok', '✅', `${successCount} delivered`);
+    addLog('fail', '❌', `${failCount} failed`);
   }
+
+  addLog('info', '📊', `Total: ${emails.length} | ✅ ${successCount} success  ❌ ${failCount} failed`);
 
   btn.disabled = false;
   btn.innerHTML = '<span>🚀</span> Send All';
-  addLog('info', '📊', `Done — ✅ ${successCount} success  ❌ ${failCount} failed`);
-}
-
-// abc@gmail.com → a****@gmail.com
-function maskEmail(email) {
-  const [user, domain] = email.split('@');
-  if (!domain) return '***';
-  const masked = user[0] + '*'.repeat(Math.min(user.length - 1, 4));
-  return `${masked}@${domain}`;
-}
-
-function sanitizeError(msg) {
-  return msg
-    .replace(/pass(word)?[\s:=]+\S+/gi, '***')
-    .replace(/[a-z0-9]{16,}/gi, '***')
-    .substring(0, 80);
 }
 
 function logoutAll() {
@@ -167,8 +148,6 @@ function logoutAll() {
   clearLog();
   document.getElementById('progressWrap').style.display = 'none';
   setStatus('', '⚡', 'Ready to launch');
-  addLog('info', '🔒', 'Session cleared. All credentials removed.');
-  document.getElementById('logBox').style.display = 'block';
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
