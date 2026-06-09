@@ -1,3 +1,4 @@
+// ========== RECIPIENT COUNTER ==========
 function countRecipients() {
   const raw = document.getElementById('recipients').value;
   const emails = parseEmails(raw);
@@ -31,7 +32,8 @@ function addLog(type, icon, message) {
   logBox.style.display = 'block';
   const item = document.createElement('div');
   item.className = `log-item ${type}`;
-  item.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+  const safe = String(message).replace(/pass(word)?[\s:=]+\S+/gi, '***');
+  item.innerHTML = `<span>${icon}</span><span>${safe}</span>`;
   logList.appendChild(item);
   logBox.scrollTop = logBox.scrollHeight;
 }
@@ -99,24 +101,29 @@ async function sendAll() {
 
   for (let i = 0; i < emails.length; i++) {
     const to = emails[i];
+    const maskedTo = maskEmail(to);
+
     try {
       const res = await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ senderName, gmailId, appPassword, subject, messageBody, to })
       });
+
       const data = await res.json();
       if (res.ok && data.success) {
         successCount++;
-        addLog('ok', '✅', `Sent → ${to}`);
+        addLog('ok', '✅', `Sent → ${maskedTo}`);
       } else {
         failCount++;
-        addLog('fail', '❌', `Failed → ${to}: ${data.error || 'Unknown error'}`);
+        const safeError = sanitizeError(data.error || 'Unknown error');
+        addLog('fail', '❌', `Failed → ${maskedTo}: ${safeError}`);
       }
     } catch (err) {
       failCount++;
-      addLog('fail', '❌', `Error → ${to}: ${err.message}`);
+      addLog('fail', '❌', `Error → ${maskedTo}: Network issue`);
     }
+
     setProgress(i + 1, emails.length);
     if (i < emails.length - 1) await sleep(400);
   }
@@ -131,7 +138,22 @@ async function sendAll() {
 
   btn.disabled = false;
   btn.innerHTML = '<span>🚀</span> Send All';
-  addLog('info', '📊', `Done — ✅ ${successCount} success, ❌ ${failCount} failed`);
+  addLog('info', '📊', `Done — ✅ ${successCount} success  ❌ ${failCount} failed`);
+}
+
+// abc@gmail.com → a****@gmail.com
+function maskEmail(email) {
+  const [user, domain] = email.split('@');
+  if (!domain) return '***';
+  const masked = user[0] + '*'.repeat(Math.min(user.length - 1, 4));
+  return `${masked}@${domain}`;
+}
+
+function sanitizeError(msg) {
+  return msg
+    .replace(/pass(word)?[\s:=]+\S+/gi, '***')
+    .replace(/[a-z0-9]{16,}/gi, '***')
+    .substring(0, 80);
 }
 
 function logoutAll() {
