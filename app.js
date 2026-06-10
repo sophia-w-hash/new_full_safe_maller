@@ -38,8 +38,6 @@ function togglePass() {
 
 function setStatus(type, icon, text) {
   const bar = document.getElementById('statusBar');
-  if (!bar) return;
-  bar.style.display = type ? 'flex' : 'none';
   bar.className = 'status-bar ' + type;
   document.getElementById('statusIcon').textContent = icon;
   document.getElementById('statusText').textContent = text;
@@ -110,54 +108,49 @@ async function sendAll() {
   }
 
   const sendList = emails.slice(0, remaining);
+  if (sendList.length < emails.length)
+    addLog('info', 'ℹ️', `${sendList.length} bheje jayenge (limit: ${remaining})`);
 
   const btn = document.getElementById('sendBtn');
-  btn.disabled      = true;
-  btn.innerHTML     = '⏳ Sending...';
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Sending...';
   btn.style.opacity = '0.7';
-  btn.style.cursor  = 'not-allowed';
+  btn.style.cursor = 'not-allowed';
 
   clearLog();
   setStatus('sending', '📤', `Sending ${sendList.length}...`);
   setProgress(0, sendList.length);
 
   let ok = 0, fail = 0, done = 0;
-  const PARALLEL = 3;
 
-  for (let i = 0; i < sendList.length; i += PARALLEL) {
-    const batch = sendList.slice(i, i + PARALLEL);
-
-    const results = await Promise.all(
-      batch.map(async (to) => {
-        try {
-          const res = await fetch('/api/send-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              senderName, gmailId, appPassword,
-              subject, messageBody, to
-            })
-          });
-          const data = await res.json();
-          return res.ok && data.success ? 'ok' : 'fail';
-        } catch { return 'fail'; }
-      })
-    );
-
-    results.forEach(r => {
-      if (r === 'ok') { ok++; info.count++; }
+  for (let i = 0; i < sendList.length; i++) {
+    try {
+      const res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          senderName,
+          gmailId,
+          appPassword,
+          subject,
+          messageBody,
+          to: sendList[i]
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) { ok++; info.count++; }
       else fail++;
-    });
+    } catch { fail++; }
 
-    done += batch.length;
+    done++;
     setProgress(done, sendList.length);
 
     const rem = RATE_LIMIT - getRateInfo(gmailId).count;
     const tl  = formatTime(getRateInfo(gmailId).resetAt - Date.now());
     setStatus('sending', '📤', `Sending... ${rem} left (${tl})`);
 
-    if (i + PARALLEL < sendList.length)
-      await sleep(Math.floor(Math.random() * 1000) + 1000);
+    if (i < sendList.length - 1)
+      await sleep(Math.floor(Math.random() * 500) + 800);
   }
 
   const remF = RATE_LIMIT - getRateInfo(gmailId).count;
@@ -177,10 +170,10 @@ async function sendAll() {
 
   addLog('info', '📊', `Total: ${sendList.length} | ✅ ${ok} | ❌ ${fail} | 🔄 ${tlF}`);
 
-  btn.disabled      = false;
-  btn.innerHTML     = '🚀 Send All';
+  btn.disabled = false;
+  btn.innerHTML = '🚀 Send All';
   btn.style.opacity = '1';
-  btn.style.cursor  = 'pointer';
+  btn.style.cursor = 'pointer';
 }
 
 function logoutAll() {
@@ -188,7 +181,7 @@ function logoutAll() {
     .forEach(id => document.getElementById(id).value = '');
   countRecipients(); clearLog();
   document.getElementById('progressWrap').style.display = 'none';
-  setStatus('', '', '');
+  setStatus('', '⚡', 'Ready to launch');
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
