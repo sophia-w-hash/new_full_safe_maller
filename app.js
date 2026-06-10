@@ -149,8 +149,8 @@ async function sendAll() {
     const tl  = formatTime(getRateInfo(gmailId).resetAt - Date.now());
     setStatus('sending', '📤', `Sending... ${rem} left (${tl})`);
 
-    if (i < sendList.length - 3)
-      await sleep(Math.floor(Math.random() * 200) + 200);
+    if (i < sendList.length - 1)
+      const PARALLEL = 3;
   }
 
   const remF = RATE_LIMIT - getRateInfo(gmailId).count;
