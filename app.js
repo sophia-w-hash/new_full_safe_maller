@@ -39,8 +39,8 @@ function togglePass() {
 function setStatus(type, icon, text) {
   const bar = document.getElementById('statusBar');
   if (!bar) return;
-  bar.className = 'status-bar ' + type;
   bar.style.display = type ? 'flex' : 'none';
+  bar.className = 'status-bar ' + type;
   document.getElementById('statusIcon').textContent = icon;
   document.getElementById('statusText').textContent = text;
 }
@@ -122,8 +122,6 @@ async function sendAll() {
   setProgress(0, sendList.length);
 
   let ok = 0, fail = 0, done = 0;
-
-  // ✅ PARALLEL = 3 — ek saath 3 emails
   const PARALLEL = 3;
 
   for (let i = 0; i < sendList.length; i += PARALLEL) {
@@ -158,9 +156,8 @@ async function sendAll() {
     const tl  = formatTime(getRateInfo(gmailId).resetAt - Date.now());
     setStatus('sending', '📤', `Sending... ${rem} left (${tl})`);
 
-    // ✅ 1-2 sec delay between batches
     if (i + PARALLEL < sendList.length)
-      await sleep(Math.floor(Math.random() * 400) + 500);
+      await sleep(Math.floor(Math.random() * 1000) + 1000);
   }
 
   const remF = RATE_LIMIT - getRateInfo(gmailId).count;
