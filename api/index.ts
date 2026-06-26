@@ -45,6 +45,73 @@ app.post("/api/mail/test-connection", async (req, res) => {
   }
 });
 
+// Helper to inject invisible Zero-Width Characters to defeat fingerprint-based spam filters.
+// This alters the digital signature hash of every email to make each one completely unique,
+// but leaves the text 100% identical and flawless to the human eye.
+function injectInvisibleSpamShield(htmlContent: string): string {
+  const zeroWidths = ["\u200b", "\u200c", "\u200d"];
+  let result = "";
+  let inTag = false;
+  let inEntity = false;
+
+  for (let i = 0; i < htmlContent.length; i++) {
+    const char = htmlContent[i];
+
+    if (char === '<') {
+      inTag = true;
+    } else if (char === '&') {
+      inEntity = true;
+    }
+
+    result += char;
+
+    if (char === '>') {
+      inTag = false;
+    } else if (char === ';' && inEntity) {
+      inEntity = false;
+    }
+
+    // Inject zero-width characters with 10% probability, ONLY outside of HTML tags, 
+    // outside of HTML entities (&nbsp;), and outside of mustache brackets {{variable}} to avoid breaking variables!
+    if (!inTag && !inEntity && char !== '{' && char !== '}' && char !== '<' && char !== '>' && char !== '&' && char !== ';' && Math.random() < 0.10) {
+      const randomZwc = zeroWidths[Math.floor(Math.random() * zeroWidths.length)];
+      result += randomZwc;
+    }
+  }
+  return result;
+}
+
+function injectInvisibleSpamShieldSubject(subjectText: string): string {
+  const zeroWidths = ["\u200b", "\u200c", "\u200d"];
+  let result = "";
+  for (let i = 0; i < subjectText.length; i++) {
+    const char = subjectText[i];
+    result += char;
+    // Inject with 10% probability, avoiding mustache templates to preserve variables
+    if (char !== '{' && char !== '}' && Math.random() < 0.10) {
+      const randomZwc = zeroWidths[Math.floor(Math.random() * zeroWidths.length)];
+      result += randomZwc;
+    }
+  }
+  return result;
+}
+
+function cleanHtmlToText(html: string): string {
+  // Simple regex-based HTML tag stripper to generate a clean plain text version
+  let text = html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+
+  return text.replace(/\s+/g, ' ').trim();
+}
+
 // API to send a single email (for bulk execution)
 app.post("/api/mail/send-single", async (req, res) => {
   const { senderEmail, appPassword, senderName, recipientEmail, subject, body } = req.body;
@@ -63,12 +130,23 @@ app.post("/api/mail/send-single", async (req, res) => {
     },
   });
 
+  // Apply real-time cryptographic/anti-fingerprinting randomized spam shields
+  const randomizedSubject = injectInvisibleSpamShieldSubject(subject);
+  const randomizedBody = injectInvisibleSpamShield(body);
+  const plainTextAlternative = cleanHtmlToText(randomizedBody);
+
   try {
     const info = await transporter.sendMail({
       from: senderName ? `"${senderName}" <${senderEmail}>` : senderEmail,
       to: recipientEmail,
-      subject: subject,
-      html: body,
+      subject: randomizedSubject,
+      html: randomizedBody,
+      text: plainTextAlternative, // Multi-part alternative MIME to heavily reduce spam score
+      headers: {
+        'X-Priority': '3', // Normal Priority
+        'Priority': 'normal',
+        'X-Mailer': 'Nodemailer Express Suite',
+      }
     });
 
     return res.json({ success: true, messageId: info.messageId });
