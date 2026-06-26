@@ -61,7 +61,7 @@ export default function App() {
   const [currentSendingIndex, setCurrentSendingIndex] = useState<number>(-1);
   const [delaySeconds, setDelaySeconds] = useState(6); // default to 6 seconds for safer delivery
   const [randomizeDelay, setRandomizeDelay] = useState(true); // default to true for human-like pattern
-  const [addUniqueIdToSubject, setAddUniqueIdToSubject] = useState(true); // append unique id to evade Gmail duplicate filter
+  const [addUniqueIdToSubject, setAddUniqueIdToSubject] = useState(false); // FALSE by default so no extra words are added unless manually checked
   
   // Connection Test & Logs State
   const [testingConnection, setTestingConnection] = useState(false);
@@ -69,6 +69,28 @@ export default function App() {
   const [bulkLog, setBulkLog] = useState<string[]>([]);
   
   const stopRequestedRef = useRef(false);
+
+  // Synchronous references to avoid triggering the useEffect sending loop on state/prop change
+  const recipientsRef = useRef<MailSendStatus[]>([]);
+  const delaySecondsRef = useRef(delaySeconds);
+  const randomizeDelayRef = useRef(randomizeDelay);
+  const subjectRef = useRef(subject);
+  const bodyRef = useRef(body);
+  const addUniqueIdToSubjectRef = useRef(addUniqueIdToSubject);
+  const senderEmailRef = useRef(senderEmail);
+  const appPasswordRef = useRef(appPassword);
+  const senderNameRef = useRef(senderName);
+
+  // Keep references in sync with state changes
+  useEffect(() => { recipientsRef.current = recipients; }, [recipients]);
+  useEffect(() => { delaySecondsRef.current = delaySeconds; }, [delaySeconds]);
+  useEffect(() => { randomizeDelayRef.current = randomizeDelay; }, [randomizeDelay]);
+  useEffect(() => { subjectRef.current = subject; }, [subject]);
+  useEffect(() => { bodyRef.current = body; }, [body]);
+  useEffect(() => { addUniqueIdToSubjectRef.current = addUniqueIdToSubject; }, [addUniqueIdToSubject]);
+  useEffect(() => { senderEmailRef.current = senderEmail; }, [senderEmail]);
+  useEffect(() => { appPasswordRef.current = appPassword; }, [appPassword]);
+  useEffect(() => { senderNameRef.current = senderName; }, [senderName]);
 
   // Parse recipients input dynamically on change or send
   const parseRecipients = (text: string): MailSendStatus[] => {
@@ -186,12 +208,15 @@ export default function App() {
     return output;
   };
 
-  // Bulk send loop handler
+  // Bulk send loop handler - Triggers ONLY when isSending changes to true
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    if (!isSending) return;
+
+    let active = true;
+    let timerId: NodeJS.Timeout | null = null;
 
     const sendNext = async () => {
-      if (!isSending) return;
+      if (!active) return;
       if (stopRequestedRef.current) {
         setIsSending(false);
         stopRequestedRef.current = false;
@@ -199,8 +224,10 @@ export default function App() {
         return;
       }
 
-      // Find first pending recipient
-      const targetIndex = recipients.findIndex(r => r.status === 'pending');
+      // Find first pending recipient using the ref to avoid stale state
+      const currentRecipients = recipientsRef.current;
+      const targetIndex = currentRecipients.findIndex(r => r.status === 'pending');
+      
       if (targetIndex === -1) {
         setIsSending(false);
         setCurrentSendingIndex(-1);
@@ -210,35 +237,34 @@ export default function App() {
       }
 
       setCurrentSendingIndex(targetIndex);
-      const target = recipients[targetIndex];
+      const target = currentRecipients[targetIndex];
 
-      // Mark status as sending
-      setRecipients(prev => {
-        const updated = [...prev];
-        updated[targetIndex] = { ...updated[targetIndex], status: 'sending' };
-        return updated;
-      });
+      // Mark status as sending in state and ref synchronously
+      const updatedListBeforeSend = [...currentRecipients];
+      updatedListBeforeSend[targetIndex] = { ...updatedListBeforeSend[targetIndex], status: 'sending' };
+      setRecipients(updatedListBeforeSend);
+      recipientsRef.current = updatedListBeforeSend;
 
       const uniqueMailId = Math.floor(100000 + Math.random() * 900000).toString();
       
-      // Personalization & Anti-spam subject tweak
-      let parsedSubject = renderTemplate(subject, target, uniqueMailId);
-      if (addUniqueIdToSubject) {
+      // Personalization
+      let parsedSubject = renderTemplate(subjectRef.current, target, uniqueMailId);
+      if (addUniqueIdToSubjectRef.current) {
         parsedSubject = `${parsedSubject} [Ref: #${uniqueMailId}]`;
       }
       
-      const parsedBody = renderTemplate(body, target, uniqueMailId);
+      const parsedBody = renderTemplate(bodyRef.current, target, uniqueMailId);
 
-      addLog(`[${targetIndex + 1}/${recipients.length}] Sending to ${target.email}...`);
+      addLog(`[${targetIndex + 1}/${currentRecipients.length}] Sending to ${target.email}...`);
 
       try {
         const response = await fetch('/api/mail/send-single', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            senderEmail,
-            appPassword,
-            senderName,
+            senderEmail: senderEmailRef.current,
+            appPassword: appPasswordRef.current,
+            senderName: senderNameRef.current,
             recipientEmail: target.email,
             subject: parsedSubject,
             body: parsedBody
@@ -248,49 +274,50 @@ export default function App() {
         const data = await response.json();
         const sentTime = new Date().toLocaleTimeString();
 
+        if (!active) return;
+
         if (data.success) {
-          setRecipients(prev => {
-            const updated = [...prev];
-            updated[targetIndex] = { ...updated[targetIndex], status: 'success', sentAt: sentTime };
-            return updated;
-          });
+          const updatedListAfterSend = [...recipientsRef.current];
+          updatedListAfterSend[targetIndex] = { ...updatedListAfterSend[targetIndex], status: 'success', sentAt: sentTime };
+          setRecipients(updatedListAfterSend);
+          recipientsRef.current = updatedListAfterSend;
           addLog(`✅ Delivered to ${target.email}`);
         } else {
-          setRecipients(prev => {
-            const updated = [...prev];
-            updated[targetIndex] = { ...updated[targetIndex], status: 'failed', error: data.message, sentAt: sentTime };
-            return updated;
-          });
+          const updatedListAfterSend = [...recipientsRef.current];
+          updatedListAfterSend[targetIndex] = { ...updatedListAfterSend[targetIndex], status: 'failed', error: data.message, sentAt: sentTime };
+          setRecipients(updatedListAfterSend);
+          recipientsRef.current = updatedListAfterSend;
           addLog(`❌ Failed for ${target.email}: ${data.message}`);
         }
       } catch (err: any) {
+        if (!active) return;
         const sentTime = new Date().toLocaleTimeString();
-        setRecipients(prev => {
-          const updated = [...prev];
-          updated[targetIndex] = { ...updated[targetIndex], status: 'failed', error: err.message, sentAt: sentTime };
-          return updated;
-        });
+        const updatedListAfterSend = [...recipientsRef.current];
+        updatedListAfterSend[targetIndex] = { ...updatedListAfterSend[targetIndex], status: 'failed', error: err.message, sentAt: sentTime };
+        setRecipients(updatedListAfterSend);
+        recipientsRef.current = updatedListAfterSend;
         addLog(`❌ Network error for ${target.email}: ${err.message}`);
       }
 
-      // Set timeout for next mail with optional randomized jitter
-      if (isSending && !stopRequestedRef.current) {
-        // Humanized jitter: Add -1 to +2 seconds random delay
-        const actualDelay = randomizeDelay 
-          ? Math.max(2, delaySeconds + Math.floor(Math.random() * 4) - 1)
-          : delaySeconds;
+      // Schedule next email sending
+      if (active && !stopRequestedRef.current) {
+        const actualDelay = randomizeDelayRef.current 
+          ? Math.max(2, delaySecondsRef.current + Math.floor(Math.random() * 4) - 1)
+          : delaySecondsRef.current;
 
         addLog(`Sleeping for ${actualDelay}s to emulate human behavior...`);
-        timer = setTimeout(sendNext, actualDelay * 1000);
+        timerId = setTimeout(sendNext, actualDelay * 1000);
       }
     };
 
-    if (isSending) {
-      sendNext();
-    }
+    // Trigger the initial send
+    sendNext();
 
-    return () => clearTimeout(timer);
-  }, [isSending, currentSendingIndex, recipients, delaySeconds, randomizeDelay, subject, body, addUniqueIdToSubject]);
+    return () => {
+      active = false;
+      if (timerId) clearTimeout(timerId);
+    };
+  }, [isSending]);
 
   // Start sending triggered by send button
   const handleStartSending = () => {
@@ -305,7 +332,10 @@ export default function App() {
       return;
     }
 
+    // Set lists synchronously in state and references immediately to prevent race conditions
     setRecipients(list);
+    recipientsRef.current = list;
+    
     stopRequestedRef.current = false;
     setIsSending(true);
     addLog(`🚀 Initializing bulk send to ${list.length} clients...`);
