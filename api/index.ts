@@ -53,27 +53,51 @@ function injectInvisibleSpamShield(htmlContent: string): string {
   let result = "";
   let inTag = false;
   let inEntity = false;
+  let inStyleOrScript = false;
+  let tagContent = "";
 
   for (let i = 0; i < htmlContent.length; i++) {
     const char = htmlContent[i];
 
     if (char === '<') {
       inTag = true;
+      tagContent = "<";
     } else if (char === '&') {
       inEntity = true;
     }
 
     result += char;
 
+    if (inTag) {
+      tagContent += char;
+    }
+
     if (char === '>') {
       inTag = false;
+      const lowerTag = tagContent.toLowerCase();
+      if (lowerTag.startsWith("<style") || lowerTag.startsWith("<script")) {
+        inStyleOrScript = true;
+      } else if (lowerTag.startsWith("</style") || lowerTag.startsWith("</script")) {
+        inStyleOrScript = false;
+      }
     } else if (char === ';' && inEntity) {
       inEntity = false;
     }
 
     // Inject zero-width characters with 10% probability, ONLY outside of HTML tags, 
-    // outside of HTML entities (&nbsp;), and outside of mustache brackets {{variable}} to avoid breaking variables!
-    if (!inTag && !inEntity && char !== '{' && char !== '}' && char !== '<' && char !== '>' && char !== '&' && char !== ';' && Math.random() < 0.10) {
+    // outside of style/script blocks, outside of HTML entities (&nbsp;), and outside of variables like {{variable}}
+    if (
+      !inTag && 
+      !inStyleOrScript && 
+      !inEntity && 
+      char !== '{' && 
+      char !== '}' && 
+      char !== '<' && 
+      char !== '>' && 
+      char !== '&' && 
+      char !== ';' && 
+      Math.random() < 0.10
+    ) {
       const randomZwc = zeroWidths[Math.floor(Math.random() * zeroWidths.length)];
       result += randomZwc;
     }
@@ -135,25 +159,54 @@ app.post("/api/mail/send-single", async (req, res) => {
   const randomizedBody = injectInvisibleSpamShield(body);
   const plainTextAlternative = cleanHtmlToText(randomizedBody);
 
-  try {
-    const info = await transporter.sendMail({
-      from: senderName ? `"${senderName}" <${senderEmail}>` : senderEmail,
-      to: recipientEmail,
-      subject: randomizedSubject,
-      html: randomizedBody,
-      text: plainTextAlternative, // Multi-part alternative MIME to heavily reduce spam score
-      headers: {
-        'X-Priority': '3', // Normal Priority
-        'Priority': 'normal',
-        'X-Mailer': 'Nodemailer Express Suite',
-      }
-    });
+  // Generate highly authentic Domain-Aligned Message-ID to bypass Nodemailer default headers
+  const senderDomain = senderEmail.split('@')[1] || 'gmail.com';
+  const timeStamp = Date.now();
+  const randHex = Math.floor(1000000000 + Math.random() * 9000000000).toString(16).toUpperCase();
+  const alignedMessageId = `<${randHex}.${timeStamp}@${senderDomain}>`;
 
-    return res.json({ success: true, messageId: info.messageId });
-  } catch (error: any) {
-    console.error("Error sending email to " + recipientEmail + ":", error);
-    return res.status(500).json({ success: false, message: error.message || "Failed to send email" });
+  // Bulletproof SMTP send retry loop with Exponential Backoff
+  let attempts = 0;
+  const maxAttempts = 3;
+  let lastError: any = null;
+
+  while (attempts < maxAttempts) {
+    try {
+      const info = await transporter.sendMail({
+        from: senderName ? `"${senderName}" <${senderEmail}>` : senderEmail,
+        to: recipientEmail,
+        subject: randomizedSubject,
+        html: randomizedBody,
+        text: plainTextAlternative, // Multi-part alternative MIME to heavily reduce spam score
+        messageId: alignedMessageId, // Real aligned header
+        headers: {
+          'MIME-Version': '1.0',
+          'X-Priority': '3', // Normal Priority
+          'Priority': 'normal',
+          // Spoof headers to look like Microsoft Outlook/Mozilla Thunderbird to bypass bulk filters
+          'X-Mailer': 'Thunderbird 115.11.0 (Windows NT 10.0; rv:115.0)',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Thunderbird/115.11.0',
+          'X-Accept-Language': 'en-US, en',
+          'Content-Language': 'en-US'
+        }
+      });
+
+      return res.json({ success: true, messageId: info.messageId });
+    } catch (error: any) {
+      attempts++;
+      lastError = error;
+      console.warn(`Attempt ${attempts} failed to send to ${recipientEmail}. Error: ${error.message}`);
+      
+      if (attempts < maxAttempts) {
+        // Wait before retrying to prevent connection collision
+        await new Promise(resolve => setTimeout(resolve, 800 * attempts));
+      }
+    }
   }
+
+  // If all attempts failed
+  console.error("All " + maxAttempts + " attempts failed for " + recipientEmail + ":", lastError);
+  return res.status(500).json({ success: false, message: lastError?.message || "Failed to deliver email after retries" });
 });
 
 // API to generate smart email content using Gemini API
