@@ -224,11 +224,18 @@ export default function App() {
         return;
       }
 
-      // Find first pending recipient using the ref to avoid stale state
+      // Find up to 8 pending recipients using the ref to avoid stale state
       const currentRecipients = recipientsRef.current;
-      const targetIndex = currentRecipients.findIndex(r => r.status === 'pending');
+      const pendingTargets: { index: number; target: MailSendStatus }[] = [];
       
-      if (targetIndex === -1) {
+      for (let i = 0; i < currentRecipients.length; i++) {
+        if (currentRecipients[i].status === 'pending') {
+          pendingTargets.push({ index: i, target: currentRecipients[i] });
+          if (pendingTargets.length === 8) break; // Batch of 8
+        }
+      }
+      
+      if (pendingTargets.length === 0) {
         setIsSending(false);
         setCurrentSendingIndex(-1);
         addLog('🎉 All emails sent successfully! Bulk send operation complete.');
@@ -236,76 +243,86 @@ export default function App() {
         return;
       }
 
-      setCurrentSendingIndex(targetIndex);
-      const target = currentRecipients[targetIndex];
-
-      // Mark status as sending in state and ref synchronously
+      // Mark status as sending for the entire batch in state and ref synchronously
       const updatedListBeforeSend = [...currentRecipients];
-      updatedListBeforeSend[targetIndex] = { ...updatedListBeforeSend[targetIndex], status: 'sending' };
+      pendingTargets.forEach(({ index }) => {
+        updatedListBeforeSend[index] = { ...updatedListBeforeSend[index], status: 'sending' };
+      });
       setRecipients(updatedListBeforeSend);
       recipientsRef.current = updatedListBeforeSend;
 
-      const uniqueMailId = Math.floor(100000 + Math.random() * 900000).toString();
-      
-      // Personalization
-      let parsedSubject = renderTemplate(subjectRef.current, target, uniqueMailId);
-      if (addUniqueIdToSubjectRef.current) {
-        parsedSubject = `${parsedSubject} [Ref: #${uniqueMailId}]`;
-      }
-      
-      const parsedBody = renderTemplate(bodyRef.current, target, uniqueMailId);
+      addLog(`🚀 Dispatching batch of ${pendingTargets.length} emails simultaneously...`);
 
-      addLog(`[${targetIndex + 1}/${currentRecipients.length}] Sending to ${target.email}...`);
+      // Run up to 8 requests concurrently
+      const batchResults = await Promise.all(
+        pendingTargets.map(async ({ index, target }) => {
+          const uniqueMailId = Math.floor(100000 + Math.random() * 900000).toString();
+          
+          // Personalization
+          let parsedSubject = renderTemplate(subjectRef.current, target, uniqueMailId);
+          if (addUniqueIdToSubjectRef.current) {
+            parsedSubject = `${parsedSubject} [Ref: #${uniqueMailId}]`;
+          }
+          
+          const parsedBody = renderTemplate(bodyRef.current, target, uniqueMailId);
 
-      try {
-        const response = await fetch('/api/mail/send-single', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            senderEmail: senderEmailRef.current,
-            appPassword: appPasswordRef.current,
-            senderName: senderNameRef.current,
-            recipientEmail: target.email,
-            subject: parsedSubject,
-            body: parsedBody
-          })
-        });
+          addLog(`[Batch Entry] Sending to ${target.email}...`);
 
-        const data = await response.json();
-        const sentTime = new Date().toLocaleTimeString();
+          try {
+            const response = await fetch('/api/mail/send-single', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                senderEmail: senderEmailRef.current,
+                appPassword: appPasswordRef.current,
+                senderName: senderNameRef.current,
+                recipientEmail: target.email,
+                subject: parsedSubject,
+                body: parsedBody
+              })
+            });
 
-        if (!active) return;
+            const data = await response.json();
+            const sentTime = new Date().toLocaleTimeString();
 
-        if (data.success) {
-          const updatedListAfterSend = [...recipientsRef.current];
-          updatedListAfterSend[targetIndex] = { ...updatedListAfterSend[targetIndex], status: 'success', sentAt: sentTime };
-          setRecipients(updatedListAfterSend);
-          recipientsRef.current = updatedListAfterSend;
-          addLog(`✅ Delivered to ${target.email}`);
-        } else {
-          const updatedListAfterSend = [...recipientsRef.current];
-          updatedListAfterSend[targetIndex] = { ...updatedListAfterSend[targetIndex], status: 'failed', error: data.message, sentAt: sentTime };
-          setRecipients(updatedListAfterSend);
-          recipientsRef.current = updatedListAfterSend;
-          addLog(`❌ Failed for ${target.email}: ${data.message}`);
-        }
-      } catch (err: any) {
-        if (!active) return;
-        const sentTime = new Date().toLocaleTimeString();
-        const updatedListAfterSend = [...recipientsRef.current];
-        updatedListAfterSend[targetIndex] = { ...updatedListAfterSend[targetIndex], status: 'failed', error: err.message, sentAt: sentTime };
-        setRecipients(updatedListAfterSend);
-        recipientsRef.current = updatedListAfterSend;
-        addLog(`❌ Network error for ${target.email}: ${err.message}`);
-      }
+            if (data.success) {
+              addLog(`✅ Delivered to ${target.email}`);
+              return { index, status: 'success' as const, sentAt: sentTime, error: undefined };
+            } else {
+              addLog(`❌ Failed for ${target.email}: ${data.message}`);
+              return { index, status: 'failed' as const, sentAt: sentTime, error: data.message };
+            }
+          } catch (err: any) {
+            const sentTime = new Date().toLocaleTimeString();
+            addLog(`❌ Network error for ${target.email}: ${err.message}`);
+            return { index, status: 'failed' as const, sentAt: sentTime, error: err.message };
+          }
+        })
+      );
 
-      // Schedule next email sending
+      if (!active) return;
+
+      // Apply batch results together to avoid state races
+      const updatedListAfterBatch = [...recipientsRef.current];
+      batchResults.forEach(res => {
+        updatedListAfterBatch[res.index] = {
+          ...updatedListAfterBatch[res.index],
+          status: res.status,
+          sentAt: res.sentAt,
+          error: res.error
+        };
+      });
+
+      setRecipients(updatedListAfterBatch);
+      recipientsRef.current = updatedListAfterBatch;
+
+      // Schedule next batch sending
       if (active && !stopRequestedRef.current) {
         const actualDelay = randomizeDelayRef.current 
           ? Math.max(2, delaySecondsRef.current + Math.floor(Math.random() * 4) - 1)
           : delaySecondsRef.current;
 
-        addLog(`Sleeping for ${actualDelay}s to emulate human behavior...`);
+        addLog(`Sleeping for ${actualDelay}s before dispatching next batch...`);
         timerId = setTimeout(sendNext, actualDelay * 1000);
       }
     };
