@@ -14,7 +14,7 @@ const ai = new GoogleGenAI({
 const app = express();
 app.use(express.json({ limit: '10mb' }));
 
-// SMTP Connection verification API
+// API to test SMTP connection with Gmail app password
 app.post("/api/mail/test-connection", async (req, res) => {
   const { senderEmail, appPassword } = req.body;
 
@@ -22,6 +22,7 @@ app.post("/api/mail/test-connection", async (req, res) => {
     return res.status(400).json({ success: false, message: "Email and App Password are required" });
   }
 
+  // Clean space from password
   const cleanedPassword = appPassword.replace(/\s+/g, "");
 
   const transporter = nodemailer.createTransport({
@@ -44,7 +45,7 @@ app.post("/api/mail/test-connection", async (req, res) => {
   }
 });
 
-// Send single mail API
+// API to send a single email (for bulk execution)
 app.post("/api/mail/send-single", async (req, res) => {
   const { senderEmail, appPassword, senderName, recipientEmail, subject, body } = req.body;
 
@@ -72,12 +73,12 @@ app.post("/api/mail/send-single", async (req, res) => {
 
     return res.json({ success: true, messageId: info.messageId });
   } catch (error: any) {
-    console.error("Error sending email:", error);
+    console.error("Error sending email to " + recipientEmail + ":", error);
     return res.status(500).json({ success: false, message: error.message || "Failed to send email" });
   }
 });
 
-// Smart content generator API (Gemini-3.5-flash)
+// API to generate smart email content using Gemini API
 app.post("/api/mail/generate-content", async (req, res) => {
   const { prompt, tone, language = "English" } = req.body;
 
@@ -98,7 +99,7 @@ Output should be formatted in standard JSON with two fields: "subject" (as a str
           type: "OBJECT" as any,
           properties: {
             subject: { type: "STRING" as any, description: "Eye-catching subject line" },
-            body: { type: "STRING" as any, description: "Professional HTML formatted email body" }
+            body: { type: "STRING" as any, description: "Professional HTML formatted email body with tags like <p>, <br>, <strong>, <ul>, <li>" }
           },
           required: ["subject", "body"]
         }
@@ -114,8 +115,9 @@ Output should be formatted in standard JSON with two fields: "subject" (as a str
     return res.json({ success: true, data: parsed });
   } catch (error: any) {
     console.error("Gemini Generation Error:", error);
-    return res.status(500).json({ success: false, message: error.message || "Failed to generate content" });
+    return res.status(500).json({ success: false, message: error.message || "Failed to generate smart email content" });
   }
 });
 
+// Export Express app for Vercel serverless function handling
 export default app;
