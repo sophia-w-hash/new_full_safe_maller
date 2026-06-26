@@ -673,6 +673,19 @@ export default function App() {
                       <p className="text-[10.5px] text-slate-500">विषय के अंत में रैंडम ID जोड़ें ताकि एक समान विषय ब्लॉक न हो।</p>
                     </div>
                   </label>
+
+                  <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200 text-xs flex gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-emerald-800 flex items-center gap-1.5">
+                        Inbox Deliverability Shield Active
+                        <span className="bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider animate-pulse">AUTO-ON</span>
+                      </p>
+                      <p className="text-[11px] text-emerald-700 leading-relaxed mt-1">
+                        ईमेल फ़िल्टर (Gmail/Yahoo) को चकमा देने के लिए प्रत्येक ईमेल के भीतर <strong>अदृश्य जीरो-विड्थ कैरेक्टर</strong> मिलाए जाते हैं। इससे प्रत्येक ईमेल का डिजिटल सिग्नेचर (Fingerprint Hash) बिल्कुल अलग बनता है, लेकिन ग्राहक को ईमेल बिल्कुल साफ़ और वैसा ही दिखता है जैसा आपने लिखा है। 
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
