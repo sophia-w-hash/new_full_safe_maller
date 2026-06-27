@@ -34,6 +34,8 @@ export default function App() {
   const [senderName, setSenderName] = useState(localStorage.getItem('senderName') || '');
   const [senderEmail, setSenderEmail] = useState(localStorage.getItem('senderEmail') || '');
   const [appPassword, setAppPassword] = useState(localStorage.getItem('appPassword') || '');
+  const [senderMode, setSenderMode] = useState<'single' | 'bulk'>((localStorage.getItem('senderMode') as 'single' | 'bulk') || 'single');
+  const [bulkSendersInput, setBulkSendersInput] = useState(localStorage.getItem('bulkSendersInput') || '');
   const [subject, setSubject] = useState(localStorage.getItem('subject') || 'Important Business Update for {{Name}}');
   const [body, setBody] = useState(localStorage.getItem('body') || `<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
   <p>Dear <strong>{{Name}}</strong>,</p>
@@ -48,10 +50,12 @@ export default function App() {
     localStorage.setItem('senderName', senderName);
     localStorage.setItem('senderEmail', senderEmail);
     localStorage.setItem('appPassword', appPassword);
+    localStorage.setItem('senderMode', senderMode);
+    localStorage.setItem('bulkSendersInput', bulkSendersInput);
     localStorage.setItem('subject', subject);
     localStorage.setItem('body', body);
     localStorage.setItem('recipientsInput', recipientsInput);
-  }, [senderName, senderEmail, appPassword, subject, body, recipientsInput]);
+  }, [senderName, senderEmail, appPassword, senderMode, bulkSendersInput, subject, body, recipientsInput]);
 
   // Bulk active sending state
   const [recipients, setRecipients] = useState<MailSendStatus[]>([]);
@@ -78,6 +82,8 @@ export default function App() {
   const senderEmailRef = useRef(senderEmail);
   const appPasswordRef = useRef(appPassword);
   const senderNameRef = useRef(senderName);
+  const senderModeRef = useRef(senderMode);
+  const bulkSendersInputRef = useRef(bulkSendersInput);
 
   // Keep references in sync with state changes
   useEffect(() => { recipientsRef.current = recipients; }, [recipients]);
@@ -89,6 +95,63 @@ export default function App() {
   useEffect(() => { senderEmailRef.current = senderEmail; }, [senderEmail]);
   useEffect(() => { appPasswordRef.current = appPassword; }, [appPassword]);
   useEffect(() => { senderNameRef.current = senderName; }, [senderName]);
+  useEffect(() => { senderModeRef.current = senderMode; }, [senderMode]);
+  useEffect(() => { bulkSendersInputRef.current = bulkSendersInput; }, [bulkSendersInput]);
+
+  interface ParsedSender {
+    email: string;
+    appPassword: string;
+    label: string;
+  }
+
+  const parseBulkSenders = (text: string): ParsedSender[] => {
+    const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
+    const list: ParsedSender[] = [];
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    lines.forEach(line => {
+      // support comma, colon, or semicolon separators
+      const parts = line.split(/[,:;]+/).map(p => p.trim());
+      if (parts.length >= 2) {
+        const email = parts[0];
+        const pass = parts.slice(1).join(' ');
+        if (emailRegex.test(email)) {
+          list.push({
+            email,
+            appPassword: pass,
+            label: `${email} (${pass.substring(0, 4)}***)`
+          });
+        }
+      }
+    });
+    return list;
+  };
+
+  const getSentCountLast12Hours = (email: string): number => {
+    try {
+      const historyStr = localStorage.getItem('sender_dispatch_history') || '[]';
+      const history = JSON.parse(historyStr) as { email: string; timestamp: number }[];
+      const twelveHoursAgo = Date.now() - 12 * 60 * 60 * 1000;
+      const activeHistory = history.filter(item => item.timestamp > twelveHoursAgo);
+      localStorage.setItem('sender_dispatch_history', JSON.stringify(activeHistory));
+      return activeHistory.filter(item => item.email.toLowerCase() === email.toLowerCase()).length;
+    } catch (e) {
+      return 0;
+    }
+  };
+
+  const recordSentEmail = (email: string) => {
+    try {
+      const historyStr = localStorage.getItem('sender_dispatch_history') || '[]';
+      const history = JSON.parse(historyStr) as { email: string; timestamp: number }[];
+      history.push({ email: email.toLowerCase(), timestamp: Date.now() });
+      const twelveHoursAgo = Date.now() - 12 * 60 * 60 * 1000;
+      const activeHistory = history.filter(item => item.timestamp > twelveHoursAgo);
+      localStorage.setItem('sender_dispatch_history', JSON.stringify(activeHistory));
+    } catch (e) {
+      // ignore
+    }
+  };
 
   // Parse recipients input dynamically on change or send
   const parseRecipients = (text: string): MailSendStatus[] => {
@@ -176,6 +239,8 @@ export default function App() {
       setSenderName('');
       setSenderEmail('');
       setAppPassword('');
+      setSenderMode('single');
+      setBulkSendersInput('');
       setSubject('Important Business Update for {{Name}}');
       setBody(`<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
   <p>Dear <strong>{{Name}}</strong>,</p>
@@ -241,19 +306,60 @@ export default function App() {
         return;
       }
 
-      // Mark status as sending for the entire batch in state and ref synchronously
+      // Check sender mode and allocate appropriate accounts with 25 limit check
+      const sendersList = senderModeRef.current === 'bulk'
+        ? parseBulkSenders(bulkSendersInputRef.current)
+        : [{ email: senderEmailRef.current, appPassword: appPasswordRef.current, label: senderEmailRef.current }];
+
+      if (sendersList.length === 0 || !sendersList[0].email) {
+        setIsSending(false);
+        addLog('❌ Error: No valid Gmail Sender account(s) configured.');
+        alert('Please configure at least one valid Gmail Sender account.');
+        return;
+      }
+
+      // Pre-fetch 12-hour limit count and track current batch allocations
+      const senderAllocations: { [email: string]: number } = {};
+      sendersList.forEach(s => {
+        senderAllocations[s.email.toLowerCase()] = getSentCountLast12Hours(s.email);
+      });
+
+      const targetsWithSenders: { index: number; target: MailSendStatus; sender: typeof sendersList[0] }[] = [];
+
+      for (const { index, target } of pendingTargets) {
+        const availableSender = sendersList.find(s => {
+          const count = senderAllocations[s.email.toLowerCase()] || 0;
+          return count < 25; // Strict Gmail 25 emails / 12-hour limit
+        });
+
+        if (!availableSender) {
+          break; // Stop allocating when no eligible senders remain
+        }
+
+        targetsWithSenders.push({ index, target, sender: availableSender });
+        senderAllocations[availableSender.email.toLowerCase()] = (senderAllocations[availableSender.email.toLowerCase()] || 0) + 1;
+      }
+
+      if (targetsWithSenders.length === 0) {
+        setIsSending(false);
+        addLog('⚠️ Limit Reached: All active accounts have hit the Gmail limit of 25 emails / 12 hours!');
+        alert('⚠️ Sending Limit Reached!\nAll of your configured Gmail accounts have hit their 25-email limit in the last 12 hours.\n\nPlease add more accounts, or wait for the cooldown to reset.');
+        return;
+      }
+
+      // Mark status as sending for allocated targets in state and ref synchronously
       const updatedListBeforeSend = [...currentRecipients];
-      pendingTargets.forEach(({ index }) => {
+      targetsWithSenders.forEach(({ index }) => {
         updatedListBeforeSend[index] = { ...updatedListBeforeSend[index], status: 'sending' };
       });
       setRecipients(updatedListBeforeSend);
       recipientsRef.current = updatedListBeforeSend;
 
-      addLog(`🚀 Dispatching batch of ${pendingTargets.length} emails simultaneously...`);
+      addLog(`🚀 Dispatching batch of ${targetsWithSenders.length} emails with active account limit monitoring...`);
 
-      // Run up to 8 requests concurrently
+      // Run requests concurrently
       const batchResults = await Promise.all(
-        pendingTargets.map(async ({ index, target }) => {
+        targetsWithSenders.map(async ({ index, target, sender }) => {
           const uniqueMailId = Math.floor(100000 + Math.random() * 900000).toString();
           
           // Personalization
@@ -264,15 +370,15 @@ export default function App() {
           
           const parsedBody = renderTemplate(bodyRef.current, target, uniqueMailId);
 
-          addLog(`[Batch Entry] Sending to ${target.email}...`);
+          addLog(`[Batch Entry] Sender: ${sender.email} ➡️ Target: ${target.email}...`);
 
           try {
             const response = await fetch('/api/mail/send-single', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                senderEmail: senderEmailRef.current,
-                appPassword: appPasswordRef.current,
+                senderEmail: sender.email,
+                appPassword: sender.appPassword,
                 senderName: senderNameRef.current,
                 recipientEmail: target.email,
                 subject: parsedSubject,
@@ -284,15 +390,16 @@ export default function App() {
             const sentTime = new Date().toLocaleTimeString();
 
             if (data.success) {
-              addLog(`✅ Delivered to ${target.email}`);
+              addLog(`✅ Delivered to ${target.email} via ${sender.email}`);
+              recordSentEmail(sender.email); // Permanently log dispatch timestamp
               return { index, status: 'success' as const, sentAt: sentTime, error: undefined };
             } else {
-              addLog(`❌ Failed for ${target.email}: ${data.message}`);
+              addLog(`❌ Failed for ${target.email} via ${sender.email}: ${data.message}`);
               return { index, status: 'failed' as const, sentAt: sentTime, error: data.message };
             }
           } catch (err: any) {
             const sentTime = new Date().toLocaleTimeString();
-            addLog(`❌ Network error for ${target.email}: ${err.message}`);
+            addLog(`❌ Network error for ${target.email} via ${sender.email}: ${err.message}`);
             return { index, status: 'failed' as const, sentAt: sentTime, error: err.message };
           }
         })
@@ -336,9 +443,17 @@ export default function App() {
 
   // Start sending triggered by send button
   const handleStartSending = () => {
-    if (!senderEmail || !appPassword) {
-      alert('Your Gmail and App Password are required to start sending.');
-      return;
+    if (senderMode === 'single') {
+      if (!senderEmail || !appPassword) {
+        alert('Your Gmail and App Password are required to start sending.');
+        return;
+      }
+    } else {
+      const activeSenders = parseBulkSenders(bulkSendersInput);
+      if (activeSenders.length === 0) {
+        alert('Please enter at least one valid Gmail Sender account (format: email, password) in Bulk Senders.');
+        return;
+      }
     }
 
     const list = parseRecipients(recipientsInput);
@@ -410,10 +525,36 @@ export default function App() {
 
           <div className="p-6 space-y-6">
             
+            {/* Sender Selection Tabs */}
+            <div className="flex bg-slate-100 p-1 rounded-xl max-w-md mx-auto sm:mx-0">
+              <button
+                type="button"
+                onClick={() => setSenderMode('single')}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${
+                  senderMode === 'single'
+                    ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Single Account (एक आईडी)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSenderMode('bulk')}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${
+                  senderMode === 'bulk'
+                    ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Multiple Accounts (बल्क रोटेशन - 25 Limit)
+              </button>
+            </div>
+
             {/* 2-Column Grid matching the requested user layout structure */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
-              {/* Row 1 */}
+              {/* Row 1: Common Sender Name */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                   <User className="w-3.5 h-3.5 text-slate-400" />
@@ -428,34 +569,94 @@ export default function App() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5 text-slate-400" />
-                  Your Gmail Address
-                </label>
-                <input
-                  type="email"
-                  value={senderEmail}
-                  onChange={(e) => setSenderEmail(e.target.value)}
-                  placeholder="yourname@gmail.com"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition"
-                />
-              </div>
+              {/* Dynamic Column depending on senderMode */}
+              {senderMode === 'single' ? (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5 text-slate-400" />
+                      Your Gmail Address
+                    </span>
+                    {senderEmail && (
+                      <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded">
+                        {getSentCountLast12Hours(senderEmail)} / 25 Sent
+                      </span>
+                    )}
+                  </label>
+                  <input
+                    type="email"
+                    value={senderEmail}
+                    onChange={(e) => setSenderEmail(e.target.value)}
+                    placeholder="yourname@gmail.com"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition"
+                  />
+                  {senderEmail && (
+                    <p className="text-[10.5px] text-slate-500 mt-1.5 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                      इस Gmail ID के लिए 12 घंटे में 25 ईमेल की सीमा (limit) तय है।
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-indigo-500" />
+                      Bulk Gmail Accounts & App Passwords (email, app_password)
+                    </span>
+                    <span className="text-[10px] text-rose-600 font-bold bg-rose-50 px-2 py-0.5 rounded border border-rose-100">
+                      Auto Limit: 25 mails / 12 hours per account
+                    </span>
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={bulkSendersInput}
+                    onChange={(e) => setBulkSendersInput(e.target.value)}
+                    placeholder="example1@gmail.com, abcd efgh ijkl mnop&#13;example2@gmail.com, wxyz qwer tyui poiu"
+                    className="w-full h-32 bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-mono text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition leading-relaxed resize-none"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1.5">
+                    प्रत्येक लाइन पर एक <strong>Gmail आईडी</strong> और उसका <strong>16-Digit App Password</strong> अल्पविराम <code>,</code> लगाकर दर्ज करें।
+                  </p>
 
-              {/* Row 2 */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5 text-slate-400" />
-                  16-Digit App Password
-                </label>
-                <input
-                  type="password"
-                  value={appPassword}
-                  onChange={(e) => setAppPassword(e.target.value)}
-                  placeholder="xxxx xxxx xxxx xxxx"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition"
-                />
-              </div>
+                  {parseBulkSenders(bulkSendersInput).length > 0 && (
+                    <div className="mt-3.5 space-y-1.5 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Loaded Accounts ({parseBulkSenders(bulkSendersInput).length}) & 12h Limits Tracking</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-40 overflow-y-auto">
+                        {parseBulkSenders(bulkSendersInput).map((sender, idx) => {
+                          const count = getSentCountLast12Hours(sender.email);
+                          const isLimitReached = count >= 25;
+                          return (
+                            <div key={idx} className="flex justify-between items-center text-xs bg-white p-2.5 rounded-xl border border-slate-100 shadow-3xs">
+                              <span className="font-semibold text-slate-700 truncate max-w-[180px]" title={sender.email}>{sender.email}</span>
+                              <span className={`font-mono text-xs font-bold px-2 py-0.5 rounded ${isLimitReached ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-indigo-50 text-indigo-700 border border-indigo-200'}`}>
+                                {count} / 25 sent
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Single Mode App Password Block (Hidden in bulk mode) */}
+              {senderMode === 'single' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-slate-400" />
+                    16-Digit App Password
+                  </label>
+                  <input
+                    type="password"
+                    value={appPassword}
+                    onChange={(e) => setAppPassword(e.target.value)}
+                    placeholder="xxxx xxxx xxxx xxxx"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -528,7 +729,10 @@ export default function App() {
                 <button
                   type="button"
                   onClick={handleStartSending}
-                  disabled={!senderEmail || !appPassword || !recipientsInput}
+                  disabled={
+                    (senderMode === 'single' ? (!senderEmail || !appPassword) : !bulkSendersInput) ||
+                    !recipientsInput
+                  }
                   className="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-100 disabled:text-slate-400 text-white font-bold py-3.5 px-6 rounded-xl text-xs transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-indigo-200"
                 >
                   <Send className="w-4 h-4" />
