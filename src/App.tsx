@@ -27,8 +27,6 @@ import {
   Check,
   RefreshCw
 } from 'lucide-react';
-import GeminiComposer from './components/GeminiComposer';
-import SpamTips from './components/SpamTips';
 import { MailSendStatus } from './types';
 
 export default function App() {
@@ -231,7 +229,7 @@ export default function App() {
       for (let i = 0; i < currentRecipients.length; i++) {
         if (currentRecipients[i].status === 'pending') {
           pendingTargets.push({ index: i, target: currentRecipients[i] });
-          if (pendingTargets.length === 13) break; // Batch of 13
+          if (pendingTargets.length === 8) break; // Batch of 8
         }
       }
       
@@ -390,15 +388,7 @@ export default function App() {
           </div>
         </div>
         <div className="flex items-center gap-2.5">
-          <a 
-            href="https://myaccount.google.com/apppasswords" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold px-3 py-1.5 rounded-lg border border-indigo-100 transition flex items-center gap-1.5"
-          >
-            <KeyRound className="w-3.5 h-3.5" />
-            Generate Gmail App Password
-          </a>
+          {/* Helper links hidden to keep layout extremely clean */}
         </div>
       </header>
 
@@ -488,11 +478,11 @@ export default function App() {
                   Message Body (HTML Supported)
                 </label>
                 <textarea
-                  rows={8}
+                  rows={4}
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
                   placeholder="Write message HTML or plain text here..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-mono text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition leading-relaxed resize-none"
+                  className="w-full h-32 bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-mono text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition leading-relaxed resize-none"
                 />
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   <span className="text-[10px] text-slate-400 self-center uppercase font-mono mr-1">Insert Placeholder:</span>
@@ -519,11 +509,11 @@ export default function App() {
                   Recipients (comma or newline)
                 </label>
                 <textarea
-                  rows={8}
+                  rows={4}
                   value={recipientsInput}
                   onChange={(e) => setRecipientsInput(e.target.value)}
                   placeholder="Enter emails here. E.g.:&#13;amit@gmail.com&#13;Rohan <rohan@gmail.com>&#13;sophia@wwkart.com"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition leading-relaxed resize-none"
+                  className="w-full h-32 bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition leading-relaxed resize-none"
                 />
                 <p className="text-[10.5px] text-slate-500 mt-2">
                   एक लाइन में एक ईमेल दर्ज करें, या अल्पविराम <code>,</code> का प्रयोग करें।
@@ -573,44 +563,6 @@ export default function App() {
           
           {/* Left Column (Stats & Protection configuration) */}
           <div className="lg:col-span-6 space-y-6">
-            
-            {/* SMTP Test section */}
-            <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-3">
-              <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                <Activity className="w-4 h-4 text-indigo-500" />
-                Connection Guard Tester
-              </h3>
-              <p className="text-[11.5px] text-slate-500 leading-relaxed">
-                बल्क ईमेल भेजने से पहले, अपनी 16-Digit App Password की प्रामाणिकता जांचें।
-              </p>
-              <button
-                type="button"
-                onClick={handleTestConnection}
-                disabled={testingConnection}
-                className="w-full bg-slate-100 hover:bg-slate-200 disabled:bg-slate-50 text-slate-800 font-bold py-2 px-4 rounded-lg text-xs border border-slate-200 flex items-center justify-center gap-2 cursor-pointer"
-              >
-                {testingConnection ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    Testing credentials...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    Check App Password Security
-                  </>
-                )}
-              </button>
-
-              {connectionStatus && (
-                <div className={`p-3 rounded-lg border text-xs flex gap-2 ${
-                  connectionStatus.success ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'
-                }`}>
-                  {connectionStatus.success ? <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" /> : <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />}
-                  <span className="leading-relaxed">{connectionStatus.message}</span>
-                </div>
-              )}
-            </div>
 
             {/* Smart Spam Shield Controller */}
             <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-4">
@@ -641,7 +593,7 @@ export default function App() {
                   />
                   <div className="flex justify-between text-[10px] text-slate-400">
                     <span>2s (Fast)</span>
-                    <span className="text-emerald-600 font-semibold">Recommended: 3s - 5s</span>
+                    <span className="text-emerald-600 font-semibold">Recommended: 5s - 10s</span>
                     <span>20s (Super Safe)</span>
                   </div>
                 </div>
@@ -661,19 +613,6 @@ export default function App() {
                     </div>
                   </label>
 
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={addUniqueIdToSubject}
-                      onChange={(e) => setAddUniqueIdToSubject(e.target.checked)}
-                      className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4"
-                    />
-                    <div className="text-xs">
-                      <p className="font-semibold text-slate-800">Add Unique Mail ID to Subject line</p>
-                      <p className="text-[10.5px] text-slate-500">विषय के अंत में रैंडम ID जोड़ें ताकि एक समान विषय ब्लॉक न हो।</p>
-                    </div>
-                  </label>
-
                   <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200 text-xs flex gap-2">
                     <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                     <div>
@@ -690,18 +629,40 @@ export default function App() {
               </div>
             </div>
 
-            {/* Smart Creator with Gemini */}
-            <GeminiComposer 
-              onTemplateGenerated={(subj, bdy) => {
-                setSubject(subj);
-                setBody(bdy);
-                addLog('Template updated via Gemini AI smart generator.');
-              }} 
-            />
+            {/* Spam Protection Cloudflare Success Block */}
+            <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-3">
+              <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                Spam Protection
+              </h3>
+              
+              <div className="bg-white border border-slate-200 rounded-lg p-3 flex flex-col gap-2 shadow-xs max-w-[300px]">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="bg-emerald-100 p-1 rounded-full text-emerald-600">
+                      <Check className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs font-bold text-slate-800">Success!</span>
+                  </div>
+                  <div className="flex flex-col items-end text-[9px] text-slate-400">
+                    <div className="flex items-center gap-1">
+                      <svg className="w-4 h-4 text-orange-500" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95C8.08 7.14 9.94 6 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11c1.56.1 2.78 1.41 2.78 2.96 0 1.65-1.35 3-3 3z" />
+                      </svg>
+                      <span className="font-extrabold text-slate-600 tracking-tight">CLOUDFLARE</span>
+                    </div>
+                    <span className="text-[8px] text-slate-400">Privacy • Help</span>
+                  </div>
+                </div>
+                <div className="border border-red-200 bg-red-50 text-red-600 text-[9px] px-2 py-0.5 rounded text-center font-mono font-medium">
+                  For testing only. If seen, report to site owner
+                </div>
+              </div>
+            </div>
 
           </div>
 
-          {/* Right Column (Live stats, list tracker & logger terminal) */}
+          {/* Right Column (Live stats, list tracker) */}
           <div className="lg:col-span-6 space-y-6">
             
             {/* Real-time stats dashboard */}
@@ -741,24 +702,6 @@ export default function App() {
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* Live Terminal Logger */}
-            <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-3">
-              <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
-                Live Server Logs (डिस्पैच इतिहास)
-              </h3>
-              <div className="bg-slate-950 rounded-xl p-4 font-mono text-[11px] text-slate-300 h-48 overflow-y-auto space-y-1.5 shadow-inner">
-                {bulkLog.length === 0 ? (
-                  <p className="text-slate-500 italic">No emails sent yet. Set parameters and click send to begin.</p>
-                ) : (
-                  bulkLog.map((log, index) => (
-                    <div key={index} className="border-l-2 border-indigo-500/30 pl-2 leading-relaxed">
-                      {log}
-                    </div>
-                  ))
-                )}
-              </div>
             </div>
 
             {/* Recipient breakdown list */}
@@ -808,9 +751,6 @@ export default function App() {
           </div>
 
         </div>
-
-        {/* Deliverability Tips */}
-        <SpamTips />
 
       </main>
 
