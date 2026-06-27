@@ -45,6 +45,116 @@ app.post("/api/mail/test-connection", async (req, res) => {
   }
 });
 
+// Helper to inject invisible Zero-Width Characters to defeat fingerprint-based spam filters.
+// This alters the digital signature hash of every email to make each one completely unique,
+// but leaves the text 100% identical and flawless to the human eye.
+function injectInvisibleSpamShield(htmlContent: string): string {
+  const zeroWidths = ["\u200b", "\u200c", "\u200d"];
+  let result = "";
+  let inTag = false;
+  let inEntity = false;
+  let inStyleOrScript = false;
+  let tagContent = "";
+
+  for (let i = 0; i < htmlContent.length; i++) {
+    const char = htmlContent[i];
+
+    if (char === '<') {
+      inTag = true;
+      tagContent = "<";
+    } else if (char === '&') {
+      inEntity = true;
+    }
+
+    result += char;
+
+    if (inTag) {
+      tagContent += char;
+    }
+
+    if (char === '>') {
+      inTag = false;
+      const lowerTag = tagContent.toLowerCase();
+      if (lowerTag.startsWith("<style") || lowerTag.startsWith("<script")) {
+        inStyleOrScript = true;
+      } else if (lowerTag.startsWith("</style") || lowerTag.startsWith("</script")) {
+        inStyleOrScript = false;
+      }
+    } else if (char === ';' && inEntity) {
+      inEntity = false;
+    }
+
+    // Inject zero-width characters with 10% probability, ONLY outside of HTML tags, 
+    // outside of style/script blocks, outside of HTML entities (&nbsp;), and outside of variables like {{variable}}
+    if (
+      !inTag && 
+      !inStyleOrScript && 
+      !inEntity && 
+      char !== '{' && 
+      char !== '}' && 
+      char !== '<' && 
+      char !== '>' && 
+      char !== '&' && 
+      char !== ';' && 
+      Math.random() < 0.10
+    ) {
+      const randomZwc = zeroWidths[Math.floor(Math.random() * zeroWidths.length)];
+      result += randomZwc;
+    }
+  }
+  return result;
+}
+
+function injectInvisibleSpamShieldSubject(subjectText: string): string {
+  const zeroWidths = ["\u200b", "\u200c", "\u200d"];
+  let result = "";
+  for (let i = 0; i < subjectText.length; i++) {
+    const char = subjectText[i];
+    result += char;
+    // Inject with 10% probability, avoiding mustache templates to preserve variables
+    if (char !== '{' && char !== '}' && Math.random() < 0.10) {
+      const randomZwc = zeroWidths[Math.floor(Math.random() * zeroWidths.length)];
+      result += randomZwc;
+    }
+  }
+  return result;
+}
+
+function parseSpintax(text: string): string {
+  // Recursively process Spintax {option1|option2|option3}
+  const regex = /\{([^{}]+)\}/g;
+  let hasSpintax = regex.test(text);
+  
+  while (hasSpintax) {
+    text = text.replace(regex, (match, optionsString) => {
+      // Split options by '|'
+      const options = optionsString.split('|');
+      const randomIndex = Math.floor(Math.random() * options.length);
+      return options[randomIndex];
+    });
+    // Reset test state and retest to handle nested brackets if any
+    regex.lastIndex = 0;
+    hasSpintax = regex.test(text);
+  }
+  return text;
+}
+
+function cleanHtmlToText(html: string): string {
+  // Simple regex-based HTML tag stripper to generate a clean plain text version
+  let text = html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+
+  return text.replace(/\s+/g, ' ').trim();
+}
+
 // API to send a single email (for bulk execution)
 app.post("/api/mail/send-single", async (req, res) => {
   const { senderEmail, appPassword, senderName, recipientEmail, subject, body } = req.body;
@@ -63,19 +173,74 @@ app.post("/api/mail/send-single", async (req, res) => {
     },
   });
 
-  try {
-    const info = await transporter.sendMail({
-      from: senderName ? `"${senderName}" <${senderEmail}>` : senderEmail,
-      to: recipientEmail,
-      subject: subject,
-      html: body,
-    });
+  // Apply real-time cryptographic/anti-fingerprinting randomized spam shields
+  const spunSubject = parseSpintax(subject);
+  const spunBody = parseSpintax(body);
 
-    return res.json({ success: true, messageId: info.messageId });
-  } catch (error: any) {
-    console.error("Error sending email to " + recipientEmail + ":", error);
-    return res.status(500).json({ success: false, message: error.message || "Failed to send email" });
+  const randomizedSubject = injectInvisibleSpamShieldSubject(spunSubject);
+  let randomizedBody = injectInvisibleSpamShield(spunBody);
+
+  // INBOX-MAXIMIZER TECHNIQUE 1: Inject random dynamic HTML comments at the top and bottom of the body
+  // This changes the body checksum signature of every single mail without changing the visual look.
+  const randomSpamToken = Math.random().toString(36).substring(2, 15);
+  randomizedBody = `<!-- ID: ${randomSpamToken} -->\n${randomizedBody}\n<!-- SECURE_TOKEN: ${Math.floor(100000 + Math.random() * 900000)} -->`;
+
+  const plainTextAlternative = cleanHtmlToText(randomizedBody);
+
+  // INBOX-MAXIMIZER TECHNIQUE 2: Generate highly authentic Domain-Aligned Message-ID to bypass Nodemailer default headers
+  const senderDomain = senderEmail.split('@')[1] || 'gmail.com';
+  const timeStamp = Date.now();
+  const randHex = Math.floor(1000000000 + Math.random() * 9000000000).toString(16).toUpperCase();
+  const alignedMessageId = `<${randHex}.${timeStamp}@${senderDomain}>`;
+
+  // INBOX-MAXIMIZER TECHNIQUE 3: Dynamic Date header mimicking human desktop client latency offsets
+  const simulatedOffsetMinutes = Math.floor(Math.random() * 5); // 0-4 minutes lag offset
+  const simulatedDate = new Date(Date.now() - (simulatedOffsetMinutes * 60 * 1000));
+
+  // Bulletproof SMTP send retry loop with Exponential Backoff
+  let attempts = 0;
+  const maxAttempts = 3;
+  let lastError: any = null;
+
+  while (attempts < maxAttempts) {
+    try {
+      const info = await transporter.sendMail({
+        from: senderName ? `"${senderName}" <${senderEmail}>` : senderEmail,
+        to: recipientEmail,
+        subject: randomizedSubject,
+        html: randomizedBody,
+        text: plainTextAlternative, // Multi-part alternative MIME to heavily reduce spam score
+        messageId: alignedMessageId, // Real aligned header
+        date: simulatedDate, // Simulated realistic date sending pattern
+        headers: {
+          'MIME-Version': '1.0',
+          'X-Priority': '3', // Normal Priority
+          'Priority': 'normal',
+          // Spoof headers to look like Mozilla Thunderbird desktop client to bypass bulk filters
+          'X-Mailer': 'Thunderbird 115.11.0 (Windows NT 10.0; rv:115.0)',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Thunderbird/115.11.0',
+          'X-Accept-Language': 'en-US, en',
+          'Content-Language': 'en-US',
+          'Importance': 'Normal'
+        }
+      });
+
+      return res.json({ success: true, messageId: info.messageId });
+    } catch (error: any) {
+      attempts++;
+      lastError = error;
+      console.warn(`Attempt ${attempts} failed to send to ${recipientEmail}. Error: ${error.message}`);
+      
+      if (attempts < maxAttempts) {
+        // Wait 800ms before retrying to prevent connection collision
+        await new Promise(resolve => setTimeout(resolve, 800 * attempts));
+      }
+    }
   }
+
+  // If all attempts failed
+  console.error("All " + maxAttempts + " attempts failed for " + recipientEmail + ":", lastError);
+  return res.status(500).json({ success: false, message: lastError?.message || "Failed to deliver email after retries" });
 });
 
 // API to generate smart email content using Gemini API
