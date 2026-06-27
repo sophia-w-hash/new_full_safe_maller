@@ -641,7 +641,7 @@ export default function App() {
                   />
                   <div className="flex justify-between text-[10px] text-slate-400">
                     <span>2s (Fast)</span>
-                    <span className="text-emerald-600 font-semibold">Recommended: 5s - 10s</span>
+                    <span className="text-emerald-600 font-semibold">Recommended: 3s - 5s</span>
                     <span>20s (Super Safe)</span>
                   </div>
                 </div>
