@@ -829,37 +829,48 @@ export default function App() {
                       </p>
                     </div>
                   </div>
+
+                  {/* Interactive Spintax Guide for High Spam Protection */}
+                  <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 text-xs space-y-2">
+                    <p className="font-bold text-indigo-900 flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-500 animate-spin" />
+                      हाई-लेवल स्पैम प्रोटेक्शन: Spintax का उपयोग करें
+                    </p>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      अपने Subject या Body में <code>{"{नमस्ते|प्रणाम|Hello}"}</code> जैसे विकल्पों का उपयोग करें। हमारा सिस्टम हर ईमेल के लिए यादृच्छिक (random) विकल्प चुनकर भेजेगा, जिससे हर मैसेज यूनीक बनेगा और स्पैम फिल्टर बाईपास हो जाएंगे।
+                    </p>
+                    <div className="bg-white p-2 rounded border border-slate-100 font-mono text-[10px] text-slate-500">
+                      <strong className="text-slate-700 font-sans">उदाहरण:</strong><br />
+                      {"{प्रिय|आदरणीय} {{Name}}, {शुभकामनाएं|नमस्कार}।"}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Spam Protection Cloudflare Success Block */}
+            {/* Spam Protection Status Block */}
             <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-3">
               <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                Spam Protection
+                <ShieldCheck className="w-4 h-4 text-emerald-500 animate-bounce" />
+                Active Inbox Delivery Armour
               </h3>
               
-              <div className="bg-white border border-slate-200 rounded-lg p-3 flex flex-col gap-2 shadow-xs max-w-[300px]">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="bg-emerald-100 p-1 rounded-full text-emerald-600">
-                      <Check className="w-4 h-4" />
-                    </div>
-                    <span className="text-xs font-bold text-slate-800">Success!</span>
-                  </div>
-                  <div className="flex flex-col items-end text-[9px] text-slate-400">
-                    <div className="flex items-center gap-1">
-                      <svg className="w-4 h-4 text-orange-500" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95C8.08 7.14 9.94 6 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11c1.56.1 2.78 1.41 2.78 2.96 0 1.65-1.35 3-3 3z" />
-                      </svg>
-                      <span className="font-extrabold text-slate-600 tracking-tight">CLOUDFLARE</span>
-                    </div>
-                    <span className="text-[8px] text-slate-400">Privacy • Help</span>
-                  </div>
+              <div className="space-y-2.5">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-500">Protection Level:</span>
+                  <span className="bg-rose-50 text-rose-700 font-extrabold px-2 py-0.5 rounded border border-rose-100 uppercase text-[9px] tracking-wider animate-pulse">Maximum Guard</span>
                 </div>
-                <div className="border border-red-200 bg-red-50 text-red-600 text-[9px] px-2 py-0.5 rounded text-center font-mono font-medium">
-                  For testing only. If seen, report to site owner
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-500">Anti-Fingerprint Hash:</span>
+                  <span className="text-emerald-600 font-bold flex items-center gap-1">Enabled (Active ZWC)</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-500">MIME Multi-part Alternative:</span>
+                  <span className="text-indigo-600 font-bold">Enabled (Text & HTML)</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-500">User-Agent Spoofing:</span>
+                  <span className="text-slate-700 font-mono text-[11px]">Thunderbird 115 / Win10</span>
                 </div>
               </div>
             </div>
