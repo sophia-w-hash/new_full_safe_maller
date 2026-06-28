@@ -19,35 +19,35 @@ export default function SpamTips() {
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-emerald-600 animate-pulse" />
           <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
-            Upgraded Inbox Delivery Engine v2.0 (सक्रिय हाई-लेवल इंजन)
+            Prism-Clean Inbox Delivery Engine v2.1 (स्वच्छ इनबॉक्स इंजन)
           </h4>
         </div>
         <p className="text-[11px] text-slate-600 leading-relaxed">
-          हमने आपके ईमेल को डायरेक्ट इनबॉक्स में पहुंचाने के लिए दुनिया के सर्वश्रेष्ठ डिलीवरी टूल्स जैसे ही फीचर्स बैकएंड में जोड़े हैं:
+          हमने बैकएंड से स्पैम ट्रिगर करने वाले सभी नकली हेडर (जैसे फर्जी Thunderbird/Desktop Spoofs) और संदिग्ध अदृश्य टेक्स्ट/कमेंट्स को हटा दिया है। अब आपका ईमेल 100% प्राकृतिक और सुरक्षित तरीके से जाता है:
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1 text-[11px] text-slate-700">
           <div className="bg-white/80 p-2.5 rounded-lg border border-slate-100 flex items-start gap-1.5">
             <span className="text-emerald-500 font-bold shrink-0">✓</span>
             <div>
-              <strong>Domain-Aligned Message-ID:</strong> Nodemailer के डिफ़ॉल्ट हेडर को हटाकर प्रत्येक ईमेल को आपके सेंडर डोमेन (जैसे: @gmail.com या आपका कस्टम डोमेन) के अनुकूल जेनरेट किया जाता है। इससे SPF/DKIM/DMARC 100% संरेखित रहता है।
+              <strong>Google SMTP Authenticated Message-ID:</strong> हम Gmail SMTP के प्राकृतिक सिग्नेचर का उपयोग करते हैं। इससे Google स्वयं आपके ईमेल के लिए 100% SPF/DKIM प्रमाणित Message-ID असाइन करता है, जिससे ईमेल स्पैम फोल्डर में नहीं जाता।
             </div>
           </div>
           <div className="bg-white/80 p-2.5 rounded-lg border border-slate-100 flex items-start gap-1.5">
             <span className="text-emerald-500 font-bold shrink-0">✓</span>
             <div>
-              <strong>Checksum Variance (हस्ताक्षर भिन्नता):</strong> प्रत्येक ईमेल के बैकएंड में एक अदृश्य रैंडम टोकन (Dynamic HTML comment व माइक्रो-आईडी) मिलाया जाता है ताकि कोई भी दो ईमेल फ़ाइल-सिग्नेचर लेवल पर समान न लगें। स्पैम फ़िल्टर्स बल्क सिग्नेचर नहीं पकड़ पाते।
+              <strong>100% Natural Formatting:</strong> कोई स्पैम-ईवेज़न कोड (अदृश्य जीरो-विड्थ कैरेक्टर या हिडन डिव्स) नहीं जोड़े जाते। आधुनिक जीमेल एल्गोरिदम इन तकनीकों को तुरंत ब्लॉक करते हैं, इसलिए शुद्ध, प्राकृतिक कंटेंट ही बेस्ट रिजल्ट देता है।
             </div>
           </div>
           <div className="bg-white/80 p-2.5 rounded-lg border border-slate-100 flex items-start gap-1.5">
             <span className="text-emerald-500 font-bold shrink-0">✓</span>
             <div>
-              <strong>Desktop Client Simulation:</strong> ईमेल के हेडर को इस प्रकार री-स्ट्रक्चर किया गया है कि वे सर्वर स्क्रिप्ट के बजाय वास्तविक Mozilla Thunderbird या Outlook डेस्कटॉप ऐप से भेजे गए वन-टू-वन पर्सनल ईमेल प्रतीत होते हैं।
+              <strong>Optimal Human Sending Latency:</strong> ईमेल भेजने के टाइम को नेचुरल गैप पर सेट करें। हर ईमेल के बीच कम से कम 3-5 सेकंड का गैप रखने से जीमेल आपके कनेक्शन को ब्लॉक नहीं करता और भेजने की गति भी बहुत तेज़ रहती है।
             </div>
           </div>
           <div className="bg-white/80 p-2.5 rounded-lg border border-slate-100 flex items-start gap-1.5">
             <span className="text-emerald-500 font-bold shrink-0">✓</span>
             <div>
-              <strong>No Bulk Flags:</strong> हमने <code>Precedence: bulk</code> और <code>List-Unsubscribe</code> हेडर को हटा दिया है। सामान्य Gmail ऐप पासवर्ड से बल्क फ्लैग वाले ईमेल्स को भेजने पर Gmail उन्हें तुरंत स्पैम या प्रमोशन्स फोल्डर में डाल देता है।
+              <strong>Dynamic Spintax Generator:</strong> हर ईमेल के शब्दों को यादृच्छिक रूप से बदलने के लिए <code>{"{नमस्ते|प्रणाम}"}</code> जैसी स्पिनटैक्स का उपयोग करें। इससे हर प्राप्तकर्ता को बिल्कुल अलग मेल प्राप्त होता है।
             </div>
           </div>
         </div>
