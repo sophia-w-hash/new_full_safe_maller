@@ -194,17 +194,6 @@ function preserveLineBreaksInHtml(html: string): string {
   }).join('');
 }
 
-// Helper to automatically append unsubscribe/remove text nicely formatted inside the template
-function appendUnsubscribeText(bodyHtml: string): string {
-  const unsubscribeText = `<br /><hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" /><p style="font-size: 11px; color: #718096; text-align: center; margin: 0; font-family: sans-serif; line-height: 1.4;">If you don't wish to receive further updates, please reply with 'Remove'.</p>`;
-  
-  const lastDivIndex = bodyHtml.lastIndexOf('</div>');
-  if (lastDivIndex !== -1) {
-    return bodyHtml.substring(0, lastDivIndex) + unsubscribeText + bodyHtml.substring(lastDivIndex);
-  }
-  return bodyHtml + `<div style="margin-top: 20px;">` + unsubscribeText + `</div>`;
-}
-
 // API to send a single email (for bulk execution)
 app.post("/api/mail/send-single", async (req, res) => {
   const { senderEmail, appPassword, senderName, recipientEmail, subject, body, deliveryMode = "clean" } = req.body;
@@ -223,8 +212,8 @@ app.post("/api/mail/send-single", async (req, res) => {
     },
   });
 
-  // Format body to preserve line breaks and append opt-out footer automatically
-  const processedBody = appendUnsubscribeText(preserveLineBreaksInHtml(body));
+  // Format body to preserve line breaks
+  const processedBody = preserveLineBreaksInHtml(body);
 
   // Expand spintax (e.g. {Hello|Hi|Greetings})
   const spunSubject = parseSpintax(subject);
