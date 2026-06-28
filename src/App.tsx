@@ -48,7 +48,11 @@ export default function App() {
 <p>{Best regards|Warm regards|Sincerely},<br><strong>{{SenderName}}</strong></p>`);
   const [recipientsInput, setRecipientsInput] = useState(localStorage.getItem('recipientsInput') || '');
   const [concurrency, setConcurrency] = useState(() => {
-    return parseInt(localStorage.getItem('concurrency') || '9');
+    const cached = localStorage.getItem('concurrency');
+    if (!cached || cached === '1') {
+      return 9;
+    }
+    return parseInt(cached);
   });
 
   // Persist inputs to localStorage
@@ -410,7 +414,7 @@ export default function App() {
         return;
       }
 
-      // Check sender limit with 25 limit check using locked sender credentials
+      // Check sender limit with 500 limit check using locked sender credentials
       const currentSenderEmail = activeSenderEmailRef.current || senderEmailRef.current;
       const currentAppPassword = activeAppPasswordRef.current || appPasswordRef.current;
       
@@ -422,15 +426,15 @@ export default function App() {
       }
 
       const count = getSentCountLast12Hours(currentSenderEmail);
-      if (count >= 25) {
+      if (count >= 500) {
         setIsSending(false);
-        addLog(`⚠️ Limit Reached: ${currentSenderEmail} has hit the Gmail limit of 25 emails / 12 hours!`);
-        alert(`⚠️ Sending Limit Reached!\nYour Gmail account ${currentSenderEmail} has hit the 25-email limit in the last 12 hours.\n\nPlease wait for the cooldown to reset.`);
+        addLog(`⚠️ Limit Reached: ${currentSenderEmail} has hit the Gmail limit of 500 emails / 12 hours!`);
+        alert(`⚠️ Sending Limit Reached!\nYour Gmail account ${currentSenderEmail} has hit the 500-email limit in the last 12 hours.\n\nPlease wait for the cooldown to reset.`);
         return;
       }
 
-      // Pre-calculate how many emails we can send in this batch without exceeding 25
-      const remainingLimit = 25 - count;
+      // Pre-calculate how many emails we can send in this batch without exceeding 500
+      const remainingLimit = 500 - count;
       const targetsWithSenders = pendingTargets.slice(0, remainingLimit).map(item => ({
         index: item.index,
         target: item.target,
@@ -439,8 +443,8 @@ export default function App() {
 
       if (targetsWithSenders.length === 0) {
         setIsSending(false);
-        addLog(`⚠️ Limit Reached: ${currentSenderEmail} has hit the Gmail limit of 25 emails / 12 hours!`);
-        alert(`⚠️ Sending Limit Reached!\nYour Gmail account ${currentSenderEmail} has hit the 25-email limit in the last 12 hours.`);
+        addLog(`⚠️ Limit Reached: ${currentSenderEmail} has hit the Gmail limit of 500 emails / 12 hours!`);
+        alert(`⚠️ Sending Limit Reached!\nYour Gmail account ${currentSenderEmail} has hit the 500-email limit in the last 12 hours.`);
         return;
       }
 
@@ -705,7 +709,7 @@ export default function App() {
                   </span>
                   {senderEmail && (
                     <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-                      {getSentCountLast12Hours(senderEmail)} / 25 Sent
+                      {getSentCountLast12Hours(senderEmail)} / 500 Sent
                     </span>
                   )}
                 </label>
@@ -719,7 +723,7 @@ export default function App() {
                 {senderEmail && (
                   <p className="text-[10.5px] text-slate-500 mt-1.5 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                    इस Gmail ID के लिए 12 घंटे में 25 ईमेल की सीमा (limit) तय है।
+                    इस Gmail ID के लिए 12 घंटे में 500 ईमेल की सीमा (limit) तय है।
                   </p>
                 )}
               </div>
@@ -824,6 +828,155 @@ export default function App() {
                 <p className="text-[10.5px] text-slate-500 mt-2">
                   एक लाइन में एक ईमेल दर्ज करें, या अल्पविराम <code>,</code> का प्रयोग करें।
                 </p>
+              </div>
+
+              {/* Speed & Concurrency Inline Panel */}
+              <div id="inline-speed-concurrency-control" className="mt-4 pt-4 border-t border-slate-100 space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-1 bg-indigo-100 text-indigo-700 rounded-lg">
+                    <Sliders className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      Batch Size & Speed Setup (बैच साइज और भेजने की स्पीड)
+                    </h4>
+                    <p className="text-[10px] text-slate-500">
+                      9 थ्रेड्स (9-by-9 Batch) चुनने पर आपके ईमेल 9-9 के ग्रुप में एक साथ बेहद तेज़ भेजे जाएंगे।
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Concurrency Threads Selector */}
+                  <div className="space-y-2 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                        <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500 animate-pulse" />
+                        Threads / Batch Size
+                      </span>
+                      <span className={`font-mono text-[10px] font-black px-2 py-0.5 rounded border ${
+                        concurrency === 1 
+                          ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
+                          : concurrency === 9
+                            ? 'text-indigo-700 bg-indigo-50 border-indigo-200 ring-2 ring-indigo-500/10'
+                            : 'text-blue-700 bg-blue-50 border-blue-200'
+                      }`}>
+                        {concurrency === 1 ? '1 Thread (Safe)' : concurrency === 9 ? '9 Threads (Recommended Batch 🚀)' : `${concurrency} Threads (Parallel)`}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setConcurrency(1)}
+                        className={`py-2 px-1.5 rounded-lg border text-[10px] font-bold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+                          concurrency === 1
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-800 ring-2 ring-emerald-500/10 shadow-xs'
+                            : 'bg-white border-slate-200 hover:border-slate-300 text-slate-600'
+                        }`}
+                      >
+                        <span>1 Thread</span>
+                        <span className="text-[8px] font-normal opacity-85">(1-by-1 Safe)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setConcurrency(5)}
+                        className={`py-2 px-1.5 rounded-lg border text-[10px] font-bold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+                          concurrency === 5
+                            ? 'bg-blue-50 border-blue-300 text-blue-800 ring-2 ring-blue-500/10 shadow-xs'
+                            : 'bg-white border-slate-200 hover:border-slate-300 text-slate-600'
+                        }`}
+                      >
+                        <span>5 Threads</span>
+                        <span className="text-[8px] font-normal opacity-85">(Medium)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setConcurrency(9)}
+                        className={`py-2 px-1.5 rounded-lg border text-[10px] font-bold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+                          concurrency === 9
+                            ? 'bg-indigo-50 border-indigo-300 text-indigo-800 ring-2 ring-indigo-300/60 shadow-sm'
+                            : 'bg-white border-slate-200 hover:border-slate-300 text-slate-600'
+                        }`}
+                      >
+                        <span className="flex items-center gap-0.5 text-indigo-900 font-extrabold">
+                          9 Threads 🔥
+                        </span>
+                        <span className="text-[8px] font-medium text-indigo-600 opacity-95">(Ideal Batch)</span>
+                      </button>
+                    </div>
+
+                    <div className="pt-2">
+                      <input
+                        type="range"
+                        min={1}
+                        max={12}
+                        value={concurrency}
+                        onChange={(e) => setConcurrency(parseInt(e.target.value))}
+                        className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                      />
+                      <div className="flex justify-between text-[9px] font-medium text-slate-400 mt-1">
+                        <span>1 (Safe)</span>
+                        <span className="text-indigo-600 font-bold">9 (Recommended)</span>
+                        <span>12 (Max)</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Delay Panel */}
+                  <div className="space-y-2 bg-slate-50/50 p-3 rounded-xl border border-slate-100 flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-indigo-500" />
+                          Delay Between Batches
+                        </span>
+                        <span className="font-mono text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                          {delaySeconds} seconds
+                        </span>
+                      </div>
+
+                      <div className="pt-2">
+                        <input
+                          type="range"
+                          min={1}
+                          max={20}
+                          value={delaySeconds}
+                          onChange={(e) => setDelaySeconds(parseInt(e.target.value))}
+                          className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                        />
+                        <div className="flex justify-between text-[9px] text-slate-400 mt-1">
+                          <span>1s (Super Fast)</span>
+                          <span className="text-emerald-600 font-semibold">Recommended: 4s - 8s</span>
+                          <span>20s (Safe)</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-100/60">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={randomizeDelay}
+                          onChange={(e) => setRandomizeDelay(e.target.checked)}
+                          className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 cursor-pointer"
+                        />
+                        <div className="text-[11px]">
+                          <p className="font-bold text-slate-700">Humanize Delay (±2s Jitter)</p>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-[10.5px] text-slate-600 leading-relaxed bg-indigo-50/40 p-3 rounded-xl border border-indigo-100/40 flex items-start gap-2">
+                  <span className="text-indigo-500 font-extrabold text-sm shrink-0 leading-none">💡</span>
+                  <p>
+                    <strong>उदाहरण के लिए:</strong> यदि आप 27 ईमेल दर्ज करते हैं और <strong>9 Threads</strong> चुनते हैं, तो सिस्टम 9-9 ईमेल के 3 अलग-अलग बैच बनाकर केवल 3 बार में बेहद तेजी से सभी 27 ईमेल भेज देगा!
+                  </p>
+                </div>
               </div>
 
             </div>
