@@ -39,12 +39,13 @@ export default function App() {
   const [appPassword, setAppPassword] = useState(localStorage.getItem('appPassword') || '');
   const [senderMode, setSenderMode] = useState<'single' | 'bulk'>((localStorage.getItem('senderMode') as 'single' | 'bulk') || 'single');
   const [bulkSendersInput, setBulkSendersInput] = useState(localStorage.getItem('bulkSendersInput') || '');
-  const [subject, setSubject] = useState(localStorage.getItem('subject') || 'Important Business Update for {{Name}}');
+  const [subject, setSubject] = useState(localStorage.getItem('subject') || '{Quick question for|Regarding website potential of|Important update for} {{Name}}');
   const [body, setBody] = useState(localStorage.getItem('body') || `<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-  <p>Dear <strong>{{Name}}</strong>,</p>
-  <p>I hope you are doing well.</p>
-  <p>We have tailored some special business solutions for you. Please let me know if you would be interested in connecting briefly to discuss how we can assist you.</p>
-  <p>Best Regards,<br><strong>{{SenderName}}</strong></p>
+  <p>{Hi|Hello|Greetings} <strong>{{Name}}</strong>,</p>
+  <p>{Hope you are doing well|Trust this email finds you well|Hope you\'re having a productive week}.</p>
+  <p>{While reviewing online opportunities, I came across your business|I recently visited your website and found it has excellent potential}. Although it is currently not on the first-page listings, your website has a strong base for visitors. I\'d like to email the custom quote we prepared for you.</p>
+  <p>{Could you please let me know if this is the best email to send it to?|Would it be alright if I share the details with you?|Let me know if you would be interested in taking a look}.</p>
+  <p>{Best regards|Warm regards|Sincerely},<br><strong>{{SenderName}}</strong></p>
 </div>`);
   const [recipientsInput, setRecipientsInput] = useState(localStorage.getItem('recipientsInput') || '');
 
@@ -257,12 +258,13 @@ export default function App() {
       setAppPassword('');
       setSenderMode('single');
       setBulkSendersInput('');
-      setSubject('Important Business Update for {{Name}}');
+      setSubject('{Quick question for|Regarding website potential of|Important update for} {{Name}}');
       setBody(`<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-  <p>Dear <strong>{{Name}}</strong>,</p>
-  <p>I hope you are doing well.</p>
-  <p>We have tailored some special business solutions for you. Please let me know if you would be interested in connecting briefly to discuss how we can assist you.</p>
-  <p>Best Regards,<br><strong>{{SenderName}}</strong></p>
+  <p>{Hi|Hello|Greetings} <strong>{{Name}}</strong>,</p>
+  <p>{Hope you are doing well|Trust this email finds you well|Hope you\'re having a productive week}.</p>
+  <p>{While reviewing online opportunities, I came across your business|I recently visited your website and found it has excellent potential}. Although it is currently not on the first-page listings, your website has a strong base for visitors. I\'d like to email the custom quote we prepared for you.</p>
+  <p>{Could you please let me know if this is the best email to send it to?|Would it be alright if I share the details with you?|Let me know if you would be interested in taking a look}.</p>
+  <p>{Best regards|Warm regards|Sincerely},<br><strong>{{SenderName}}</strong></p>
 </div>`);
       setRecipientsInput('');
       setRecipients([]);
@@ -318,7 +320,7 @@ export default function App() {
       for (let i = 0; i < currentRecipients.length; i++) {
         if (currentRecipients[i].status === 'pending') {
           pendingTargets.push({ index: i, target: currentRecipients[i] });
-          if (pendingTargets.length === 9) break; // Batch of 9
+          if (pendingTargets.length === 8) break; // Batch of 8
         }
       }
       
@@ -513,7 +515,7 @@ export default function App() {
       <header id="main-header" className="bg-white border-b border-slate-200 py-4 px-6 sticky top-0 z-40 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="bg-indigo-600 text-white p-2.5 rounded-xl shadow-md">
-            <Mail className="w-5 h-5 animate-pulse" />
+            <Mail className="w-5 h-5" />
           </div>
           <div>
             <h1 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
@@ -848,27 +850,27 @@ export default function App() {
                   </div>
                 </div>
 
-                  {/* Interactive Spintax Guide for High Spam Protection */}
-                  <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 text-xs space-y-2">
-                    <p className="font-bold text-indigo-900 flex items-center gap-1">
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-500 animate-spin" />
-                      हाई-लेवल स्पैम प्रोटेक्शन: Spintax का उपयोग करें
-                    </p>
-                    <p className="text-[11px] text-slate-600 leading-relaxed">
-                      अपने Subject या Body में <code>{"{नमस्ते|प्रणाम|Hello}"}</code> जैसे विकल्पों का उपयोग करें। हमारा सिस्टम हर ईमेल के लिए यादृच्छिक (random) विकल्प चुनकर भेजेगा, जिससे हर मैसेज यूनीक बनेगा और स्पैम फिल्टर बाईपास हो जाएंगे।
-                    </p>
-                    <div className="bg-white p-2 rounded border border-slate-100 font-mono text-[10px] text-slate-500">
-                      <strong className="text-slate-700 font-sans">उदाहरण:</strong><br />
-                      {"{प्रिय|आदरणीय} {{Name}}, {शुभकामनाएं|नमस्कार}।"}
-                    </div>
+                {/* Interactive Spintax Guide for High Spam Protection */}
+                <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 text-xs space-y-2">
+                  <p className="font-bold text-indigo-900 flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                    हाई-लेवल स्पैम प्रोटेक्शन: Spintax का उपयोग करें
+                  </p>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    अपने Subject या Body में <code>{"{नमस्ते|प्रणाम|Hello}"}</code> जैसे विकल्पों का उपयोग करें। हमारा सिस्टम हर ईमेल के लिए यादृच्छिक (random) विकल्प चुनकर भेजेगा, जिससे हर मैसेज यूनीक बनेगा और स्पैम फिल्टर बाईपास हो जाएंगे।
+                  </p>
+                  <div className="bg-white p-2 rounded border border-slate-100 font-mono text-[10px] text-slate-500">
+                    <strong className="text-slate-700 font-sans">उदाहरण:</strong><br />
+                    {"{प्रिय|आदरणीय} {{Name}}, {शुभकामनाएं|नमस्कार}।"}
                   </div>
                 </div>
               </div>
+            </div>
 
             {/* Spam Protection Status Block */}
             <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-3">
               <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-emerald-500 animate-bounce" />
+                <ShieldCheck className="w-4 h-4 text-emerald-500" />
                 Active Inbox Delivery Armour
               </h3>
               
@@ -896,7 +898,7 @@ export default function App() {
             <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                  <Activity className="w-4 h-4 text-indigo-500 animate-pulse" />
+                  <Activity className="w-4 h-4 text-indigo-500" />
                   Domain & Inbox Delivery Health Guide
                 </h3>
                 <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-bold border border-emerald-100 flex items-center gap-0.5">
