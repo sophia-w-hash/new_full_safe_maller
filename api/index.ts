@@ -220,7 +220,30 @@ app.post("/api/mail/send-single", async (req, res) => {
     finalBody = injectInvisibleSpamShield(cleanBdy);
   }
 
-  const plainTextAlternative = cleanHtmlToText(spunBody);
+  // Generate highly authentic Domain-Aligned Message-ID to bypass automated mailer detection
+  const senderDomain = senderEmail.split('@')[1] || 'gmail.com';
+  const timeStamp = Date.now();
+  const randHex = Math.floor(1000000000 + Math.random() * 9000000000).toString(16).toUpperCase();
+  const alignedMessageId = `<${randHex}.${timeStamp}@${senderDomain}>`;
+
+  // INBOX-MAXIMIZER TECHNIQUE 1: Inject dynamic HTML comments & invisible DOM spacer to randomize the body's MD5 checksum
+  // This changes the body checksum signature of every single mail so spam filters can't flag it as mass duplicate template
+  const randomSpamToken = Math.random().toString(36).substring(2, 15);
+  const secureToken = Math.floor(100000 + Math.random() * 900000);
+  
+  // Create a completely invisible element that has unique content
+  const signatureVarianceTag = `<div style="display:none;font-size:1px;color:transparent;opacity:0;line-height:0;height:0;mso-hide:all;overflow:hidden;visibility:hidden;">Ref-${randomSpamToken}-${secureToken}</div>`;
+  
+  // Wrap finalBody in HTML comments and append invisible variance tag
+  finalBody = `<!-- ID: ${randomSpamToken} -->\n${finalBody}\n${signatureVarianceTag}\n<!-- SECURE_TOKEN: ${secureToken} -->`;
+
+  // Generate plain text version and append matching dynamic footnote so MIME versions align perfectly (highly valued by spam algorithms)
+  let plainTextAlternative = cleanHtmlToText(spunBody);
+  plainTextAlternative += `\n\n---\n[Ref Code: ${randomSpamToken}]`;
+
+  // Dynamic Date header mimicking human desktop client latency offsets
+  const simulatedOffsetMinutes = Math.floor(Math.random() * 5); // 0-4 minutes lag offset
+  const simulatedDate = new Date(Date.now() - (simulatedOffsetMinutes * 60 * 1000));
 
   // Bulletproof SMTP send retry loop with Exponential Backoff
   let attempts = 0;
@@ -235,13 +258,19 @@ app.post("/api/mail/send-single", async (req, res) => {
         subject: finalSubject,
         html: finalBody,
         text: plainTextAlternative, // Multi-part alternative MIME to heavily reduce spam score
+        messageId: alignedMessageId, // Real aligned header (CRITICAL: prevents Nodemailer-default domain flag)
+        date: simulatedDate, // Simulated realistic date sending pattern to emulate human click-to-send action
         headers: {
           'MIME-Version': '1.0',
           'X-Priority': '3', // Normal Priority
           'Priority': 'normal',
           'Importance': 'Normal',
-          'List-Unsubscribe': `<mailto:${senderEmail}?subject=Unsubscribe:${recipientEmail}>`,
-          'Precedence': 'bulk'
+          // Spoof headers to look like Mozilla Thunderbird desktop client (helps bypass automated mass-script filters)
+          'X-Mailer': 'Thunderbird 115.11.0 (Windows NT 10.0; rv:115.0)',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Thunderbird/115.11.0',
+          'X-Accept-Language': 'en-US, en',
+          'Content-Language': 'en-US',
+          // REMOVED 'Precedence': 'bulk' and 'List-Unsubscribe' as they force emails to land in Promotions/Spam when sent from personal app passwords
         }
       });
 
