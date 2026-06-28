@@ -183,6 +183,28 @@ function cleanHtmlToText(html: string): string {
   return text.replace(/\s+/g, ' ').trim();
 }
 
+// Helper to preserve newline characters (\n) by converting them to <br /> outside HTML tags
+function preserveLineBreaksInHtml(html: string): string {
+  const parts = html.split(/(<[^>]+>)/g);
+  return parts.map((part) => {
+    if (part.startsWith('<') && part.endsWith('>')) {
+      return part;
+    }
+    return part.replace(/\r?\n/g, '<br />\n');
+  }).join('');
+}
+
+// Helper to automatically append unsubscribe/remove text nicely formatted inside the template
+function appendUnsubscribeText(bodyHtml: string): string {
+  const unsubscribeText = `<br /><hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" /><p style="font-size: 11px; color: #718096; text-align: center; margin: 0; font-family: sans-serif; line-height: 1.4;">If you don't wish to receive further updates, please reply with 'Remove'.</p>`;
+  
+  const lastDivIndex = bodyHtml.lastIndexOf('</div>');
+  if (lastDivIndex !== -1) {
+    return bodyHtml.substring(0, lastDivIndex) + unsubscribeText + bodyHtml.substring(lastDivIndex);
+  }
+  return bodyHtml + `<div style="margin-top: 20px;">` + unsubscribeText + `</div>`;
+}
+
 // API to send a single email (for bulk execution)
 app.post("/api/mail/send-single", async (req, res) => {
   const { senderEmail, appPassword, senderName, recipientEmail, subject, body, deliveryMode = "clean" } = req.body;
@@ -201,9 +223,12 @@ app.post("/api/mail/send-single", async (req, res) => {
     },
   });
 
+  // Format body to preserve line breaks and append opt-out footer automatically
+  const processedBody = appendUnsubscribeText(preserveLineBreaksInHtml(body));
+
   // Expand spintax (e.g. {Hello|Hi|Greetings})
   const spunSubject = parseSpintax(subject);
-  const spunBody = parseSpintax(body);
+  const spunBody = parseSpintax(processedBody);
 
   let finalSubject = spunSubject;
   let finalBody = spunBody;
