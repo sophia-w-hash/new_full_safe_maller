@@ -85,6 +85,14 @@ export default function App() {
   const senderModeRef = useRef(senderMode);
   const bulkSendersInputRef = useRef(bulkSendersInput);
 
+  // Active/locked credentials for the currently running dispatch session
+  const activeSenderEmailRef = useRef('');
+  const activeAppPasswordRef = useRef('');
+  const activeSenderNameRef = useRef('');
+  const activeSubjectRef = useRef('');
+  const activeBodyRef = useRef('');
+  const activeAddUniqueIdToSubjectRef = useRef(false);
+
   // Keep references in sync with state changes
   useEffect(() => { recipientsRef.current = recipients; }, [recipients]);
   useEffect(() => { delaySecondsRef.current = delaySeconds; }, [delaySeconds]);
@@ -259,11 +267,19 @@ export default function App() {
   };
 
   // Variable Interpolation Helper
-  const renderTemplate = (text: string, recipient: MailSendStatus, uniqueId?: string) => {
+  const renderTemplate = (
+    text: string, 
+    recipient: MailSendStatus, 
+    uniqueId?: string, 
+    senderNameVal?: string, 
+    senderEmailVal?: string
+  ) => {
     let output = text;
     output = output.replace(/\{\{email\}\}/gi, recipient.email || '');
     output = output.replace(/\{\{Name\}\}/gi, recipient.name || '');
-    output = output.replace(/\{\{SenderName\}\}/gi, senderName || senderEmail || 'Solutions Team');
+    const finalSenderName = senderNameVal !== undefined ? senderNameVal : senderName;
+    const finalSenderEmail = senderEmailVal !== undefined ? senderEmailVal : senderEmail;
+    output = output.replace(/\{\{SenderName\}\}/gi, finalSenderName || finalSenderEmail || 'Solutions Team');
     
     if (uniqueId) {
       output = output.replace(/\{\{ID\}\}/gi, uniqueId);
@@ -306,9 +322,9 @@ export default function App() {
         return;
       }
 
-      // Check sender limit with 25 limit check
-      const currentSenderEmail = senderEmailRef.current;
-      const currentAppPassword = appPasswordRef.current;
+      // Check sender limit with 25 limit check using locked sender credentials
+      const currentSenderEmail = activeSenderEmailRef.current || senderEmailRef.current;
+      const currentAppPassword = activeAppPasswordRef.current || appPasswordRef.current;
       
       if (!currentSenderEmail || !currentAppPassword) {
         setIsSending(false);
@@ -355,13 +371,19 @@ export default function App() {
         targetsWithSenders.map(async ({ index, target, sender }) => {
           const uniqueMailId = Math.floor(100000 + Math.random() * 900000).toString();
           
-          // Personalization
-          let parsedSubject = renderTemplate(subjectRef.current, target, uniqueMailId);
-          if (addUniqueIdToSubjectRef.current) {
+          // Personalization using locked credentials for this active session
+          const activeSubject = activeSubjectRef.current || subjectRef.current;
+          const activeBody = activeBodyRef.current || bodyRef.current;
+          const activeSenderName = activeSenderNameRef.current || senderNameRef.current;
+          const activeSenderEmail = activeSenderEmailRef.current || senderEmailRef.current;
+          const activeAddUniqueIdToSubject = activeAddUniqueIdToSubjectRef.current || addUniqueIdToSubjectRef.current;
+
+          let parsedSubject = renderTemplate(activeSubject, target, uniqueMailId, activeSenderName, activeSenderEmail);
+          if (activeAddUniqueIdToSubject) {
             parsedSubject = `${parsedSubject} [Ref: #${uniqueMailId}]`;
           }
           
-          const parsedBody = renderTemplate(bodyRef.current, target, uniqueMailId);
+          const parsedBody = renderTemplate(activeBody, target, uniqueMailId, activeSenderName, activeSenderEmail);
 
           addLog(`[Batch Entry] Sender: ${sender.email} ➡️ Target: ${target.email}...`);
 
@@ -372,7 +394,7 @@ export default function App() {
               body: JSON.stringify({
                 senderEmail: sender.email,
                 appPassword: sender.appPassword,
-                senderName: senderNameRef.current,
+                senderName: activeSenderName,
                 recipientEmail: target.email,
                 subject: parsedSubject,
                 body: parsedBody
@@ -446,6 +468,14 @@ export default function App() {
       alert('Please enter at least one valid recipient email address.');
       return;
     }
+
+    // Capture/Freeze details for the active sending loop
+    activeSenderEmailRef.current = senderEmail;
+    activeAppPasswordRef.current = appPassword;
+    activeSenderNameRef.current = senderName;
+    activeSubjectRef.current = subject;
+    activeBodyRef.current = body;
+    activeAddUniqueIdToSubjectRef.current = addUniqueIdToSubject;
 
     // Set lists synchronously in state and references immediately to prevent race conditions
     setRecipients(list);
