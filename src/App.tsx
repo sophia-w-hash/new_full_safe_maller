@@ -48,7 +48,7 @@ export default function App() {
 <p>{Best regards|Warm regards|Sincerely},<br><strong>{{SenderName}}</strong></p>`);
   const [recipientsInput, setRecipientsInput] = useState(localStorage.getItem('recipientsInput') || '');
   const [concurrency, setConcurrency] = useState(() => {
-    return parseInt(localStorage.getItem('concurrency') || '1');
+    return parseInt(localStorage.getItem('concurrency') || '9');
   });
 
   // Persist inputs to localStorage
@@ -914,27 +914,30 @@ export default function App() {
                     <span className={`font-bold px-2 py-0.5 rounded border font-mono text-[11px] ${
                       concurrency === 1 
                         ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
-                        : concurrency <= 3 
-                          ? 'text-indigo-700 bg-indigo-50 border-indigo-200' 
-                          : 'text-amber-700 bg-amber-50 border-amber-200'
+                        : concurrency === 9
+                          ? 'text-indigo-700 bg-indigo-50 border-indigo-200 ring-1 ring-indigo-300'
+                          : concurrency <= 3 
+                            ? 'text-blue-700 bg-blue-50 border-blue-200' 
+                            : 'text-amber-700 bg-amber-50 border-amber-200'
                     }`}>
-                      {concurrency === 1 ? '1 Thread (Safe - 100% Inbox)' : `${concurrency} Threads (Parallel)`}
+                      {concurrency === 1 ? '1 Thread (Safe - 100% Inbox)' : concurrency === 9 ? '9 Threads (Optimized Batch 🚀)' : `${concurrency} Threads (Parallel)`}
                     </span>
                   </div>
                   <input
                     type="range"
                     min={1}
-                    max={8}
+                    max={12}
                     value={concurrency}
                     onChange={(e) => setConcurrency(parseInt(e.target.value))}
                     className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                   />
                   <div className="flex justify-between text-[10px] text-slate-400">
                     <span className="text-emerald-600 font-bold">1 Thread (Inbox Perfect)</span>
-                    <span className="text-amber-600 font-bold">8 Threads (Fastest Speed)</span>
+                    <span className="text-indigo-600 font-bold">9 Threads (Recommended Batch)</span>
+                    <span className="text-amber-600 font-bold">12 Threads (Fastest)</span>
                   </div>
                   <p className="text-[10.5px] text-slate-500 leading-relaxed pt-0.5">
-                    <strong>1 थ्रेड (1-by-1)</strong> ईमेल भेजने का सबसे सुरक्षित तरीका है जो 100% इनबॉक्स डिलीवरी देता है। अगर आप अत्यधिक तेज़ स्पीड चाहते हैं, तो थ्रेड्स बढ़ाएं।
+                    <strong>9 थ्रेड्स (9-by-9 Batch)</strong> डिफ़ॉल्ट रूप से सेट है जो सुपर फ़ास्ट स्पीड और उच्च इनबॉक्स डिलीवरी को संतुलित करता है। आप इसे ज़रूरत के अनुसार बदल सकते हैं।
                   </p>
                 </div>
 
