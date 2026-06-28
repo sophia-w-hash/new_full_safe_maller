@@ -42,8 +42,8 @@ export default function App() {
   const [subject, setSubject] = useState(localStorage.getItem('subject') || '{Quick question for|Regarding website potential of|Important update for} {{Name}}');
   const [body, setBody] = useState(localStorage.getItem('body') || `<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
   <p>{Hi|Hello|Greetings} <strong>{{Name}}</strong>,</p>
-  <p>{Hope you are doing well|Trust this email finds you well|Hope you\'re having a productive week}.</p>
-  <p>{While reviewing online opportunities, I came across your business|I recently visited your website and found it has excellent potential}. Although it is currently not on the first-page listings, your website has a strong base for visitors. I\'d like to email the custom quote we prepared for you.</p>
+  <p>{Hope you are doing well|Trust this email finds you well|Hope you're having a productive week}.</p>
+  <p>{While reviewing online opportunities, I came across your business|I recently visited your website and found it has excellent potential}. Although it is currently not on the first-page listings, your website has a strong base for visitors. I'd like to email the custom quote we prepared for you.</p>
   <p>{Could you please let me know if this is the best email to send it to?|Would it be alright if I share the details with you?|Let me know if you would be interested in taking a look}.</p>
   <p>{Best regards|Warm regards|Sincerely},<br><strong>{{SenderName}}</strong></p>
 </div>`);
@@ -66,10 +66,9 @@ export default function App() {
   const [recipients, setRecipients] = useState<MailSendStatus[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [currentSendingIndex, setCurrentSendingIndex] = useState<number>(-1);
-  const [delaySeconds, setDelaySeconds] = useState(3); // default to 3 seconds for safer delivery
+  const [delaySeconds, setDelaySeconds] = useState(6); // default to 6 seconds for safer delivery
   const [randomizeDelay, setRandomizeDelay] = useState(true); // default to true for human-like pattern
   const [addUniqueIdToSubject, setAddUniqueIdToSubject] = useState(false); // FALSE by default so no extra words are added unless manually checked
-  
   
   // Connection Test & Logs State
   const [testingConnection, setTestingConnection] = useState(false);
@@ -127,7 +126,6 @@ export default function App() {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     lines.forEach(line => {
-      // support comma, colon, or semicolon separators
       const parts = line.split(/[,:;]+/).map(p => p.trim());
       if (parts.length >= 2) {
         const email = parts[0];
@@ -170,7 +168,6 @@ export default function App() {
     }
   };
 
-  // Parse recipients input dynamically on change or send
   const parseRecipients = (text: string): MailSendStatus[] => {
     const items = text.split(/[\n,;]+/).map(item => item.trim()).filter(Boolean);
     const list: MailSendStatus[] = [];
@@ -180,7 +177,6 @@ export default function App() {
       let email = item;
       let name = '';
 
-      // Check if format is "Name <email>"
       const match = item.match(/([^<]+)<([^>]+)>/);
       if (match) {
         name = match[1].trim();
@@ -204,7 +200,6 @@ export default function App() {
     setBulkLog(prev => [`[${timestamp}] ${msg}`, ...prev.slice(0, 99)]);
   };
 
-  // Connection Tester
   const handleTestConnection = async () => {
     if (!senderEmail || !appPassword) {
       setConnectionStatus({
@@ -250,7 +245,6 @@ export default function App() {
     }
   };
 
-  // Clear All fields (All Logout)
   const handleAllLogout = () => {
     if (window.confirm('क्या आप सच में सभी क्रेडेंशियल्स, सेटिंग्स और प्राप्तकर्ताओं की सूची को मिटाना (Clear) चाहते हैं?')) {
       setSenderName('');
@@ -261,8 +255,8 @@ export default function App() {
       setSubject('{Quick question for|Regarding website potential of|Important update for} {{Name}}');
       setBody(`<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
   <p>{Hi|Hello|Greetings} <strong>{{Name}}</strong>,</p>
-  <p>{Hope you are doing well|Trust this email finds you well|Hope you\'re having a productive week}.</p>
-  <p>{While reviewing online opportunities, I came across your business|I recently visited your website and found it has excellent potential}. Although it is currently not on the first-page listings, your website has a strong base for visitors. I\'d like to email the custom quote we prepared for you.</p>
+  <p>{Hope you are doing well|Trust this email finds you well|Hope you're having a productive week}.</p>
+  <p>{While reviewing online opportunities, I came across your business|I recently visited your website and found it has excellent potential}. Although it is currently not on the first-page listings, your website has a strong base for visitors. I'd like to email the custom quote we prepared for you.</p>
   <p>{Could you please let me know if this is the best email to send it to?|Would it be alright if I share the details with you?|Let me know if you would be interested in taking a look}.</p>
   <p>{Best regards|Warm regards|Sincerely},<br><strong>{{SenderName}}</strong></p>
 </div>`);
@@ -276,7 +270,6 @@ export default function App() {
     }
   };
 
-  // Variable Interpolation Helper
   const renderTemplate = (
     text: string, 
     recipient: MailSendStatus, 
@@ -297,7 +290,6 @@ export default function App() {
     return output;
   };
 
-  // Bulk send loop handler - Triggers ONLY when isSending changes to true
   useEffect(() => {
     if (!isSending) return;
 
@@ -313,14 +305,13 @@ export default function App() {
         return;
       }
 
-      // Find up to 8 pending recipients using the ref to avoid stale state
       const currentRecipients = recipientsRef.current;
       const pendingTargets: { index: number; target: MailSendStatus }[] = [];
       
       for (let i = 0; i < currentRecipients.length; i++) {
         if (currentRecipients[i].status === 'pending') {
           pendingTargets.push({ index: i, target: currentRecipients[i] });
-          if (pendingTargets.length === 8) break; // Batch of 8
+          if (pendingTargets.length === 8) break;
         }
       }
       
@@ -332,7 +323,6 @@ export default function App() {
         return;
       }
 
-      // Check sender limit with 25 limit check using locked sender credentials
       const currentSenderEmail = activeSenderEmailRef.current || senderEmailRef.current;
       const currentAppPassword = activeAppPasswordRef.current || appPasswordRef.current;
       
@@ -351,7 +341,6 @@ export default function App() {
         return;
       }
 
-      // Pre-calculate how many emails we can send in this batch without exceeding 25
       const remainingLimit = 25 - count;
       const targetsWithSenders = pendingTargets.slice(0, remainingLimit).map(item => ({
         index: item.index,
@@ -366,7 +355,6 @@ export default function App() {
         return;
       }
 
-      // Mark status as sending for allocated targets in state and ref synchronously
       const updatedListBeforeSend = [...currentRecipients];
       targetsWithSenders.forEach(({ index }) => {
         updatedListBeforeSend[index] = { ...updatedListBeforeSend[index], status: 'sending' };
@@ -376,12 +364,10 @@ export default function App() {
 
       addLog(`🚀 Dispatching batch of ${targetsWithSenders.length} emails with active account limit monitoring...`);
 
-      // Run requests concurrently
       const batchResults = await Promise.all(
         targetsWithSenders.map(async ({ index, target, sender }) => {
           const uniqueMailId = Math.floor(100000 + Math.random() * 900000).toString();
           
-          // Personalization using locked credentials for this active session
           const activeSubject = activeSubjectRef.current || subjectRef.current;
           const activeBody = activeBodyRef.current || bodyRef.current;
           const activeSenderName = activeSenderNameRef.current || senderNameRef.current;
@@ -417,7 +403,7 @@ export default function App() {
 
             if (data.success) {
               addLog(`✅ Delivered to ${target.email} via ${sender.email}`);
-              recordSentEmail(sender.email); // Permanently log dispatch timestamp
+              recordSentEmail(sender.email);
               return { index, status: 'success' as const, sentAt: sentTime, error: undefined };
             } else {
               addLog(`❌ Failed for ${target.email} via ${sender.email}: ${data.message}`);
@@ -433,7 +419,6 @@ export default function App() {
 
       if (!active) return;
 
-      // Apply batch results together to avoid state races
       const updatedListAfterBatch = [...recipientsRef.current];
       batchResults.forEach(res => {
         updatedListAfterBatch[res.index] = {
@@ -447,18 +432,16 @@ export default function App() {
       setRecipients(updatedListAfterBatch);
       recipientsRef.current = updatedListAfterBatch;
 
-      // Schedule next batch sending
       if (active && !stopRequestedRef.current) {
         const actualDelay = randomizeDelayRef.current 
-          ? Math.max(2, delaySecondsRef.current + Math.floor(Math.random() * 2) - 1)
+          ? Math.max(2, delaySecondsRef.current + Math.floor(Math.random() * 4) - 1)
           : delaySecondsRef.current;
 
         addLog(`Sleeping for ${actualDelay}s before dispatching next batch...`);
-        timerId = setTimeout(sendNext, actualDelay * 600);
+        timerId = setTimeout(sendNext, actualDelay * 1000);
       }
     };
 
-    // Trigger the initial send
     sendNext();
 
     return () => {
@@ -467,7 +450,6 @@ export default function App() {
     };
   }, [isSending]);
 
-  // Start sending triggered by send button
   const handleStartSending = () => {
     if (!senderEmail || !appPassword) {
       alert('Your Gmail and App Password are required to start sending.');
@@ -480,7 +462,6 @@ export default function App() {
       return;
     }
 
-    // Capture/Freeze details for the active sending loop
     activeSenderEmailRef.current = senderEmail;
     activeAppPasswordRef.current = appPassword;
     activeSenderNameRef.current = senderName;
@@ -489,7 +470,6 @@ export default function App() {
     activeAddUniqueIdToSubjectRef.current = addUniqueIdToSubject;
     activeDeliveryModeRef.current = deliveryMode;
 
-    // Set lists synchronously in state and references immediately to prevent race conditions
     setRecipients(list);
     recipientsRef.current = list;
     
@@ -503,7 +483,6 @@ export default function App() {
     addLog('Pause requested. Stopping after current email dispatch finishes.');
   };
 
-  // Count stats
   const pendingCount = recipients.filter(r => r.status === 'pending').length;
   const successCount = recipients.filter(r => r.status === 'success').length;
   const failedCount = recipients.filter(r => r.status === 'failed').length;
@@ -529,9 +508,6 @@ export default function App() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2.5">
-          {/* Helper links hidden to keep layout extremely clean */}
-        </div>
       </header>
 
       {/* Primary Workspace container */}
@@ -551,6 +527,53 @@ export default function App() {
           </div>
 
           <div className="p-6 space-y-6">
+
+            {/* 100% Inbox Delivery Blueprint Banner */}
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 md:p-5 space-y-3.5">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 bg-emerald-600 text-white rounded-lg">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-emerald-900 uppercase tracking-wider">
+                    100% Inbox Delivery Guide (ईमेल सीधे Inbox में भेजने की तरकीबें)
+                  </h3>
+                  <p className="text-[11px] text-emerald-700">
+                    यदि आपके ईमेल Inbox में नहीं जा रहे हैं, तो नीचे दी गई 4 बातों का पालन करें:
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+                <div className="bg-white/80 backdrop-blur-xs p-3 rounded-lg border border-emerald-100/60 text-xs">
+                  <span className="font-bold text-emerald-800 block mb-1">1. "Clean & Natural" Mode चुनें</span>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    जीमेल के आधुनिक AI फ़िल्टर्स <strong>ZWC (Zero-Width Characters)</strong> को तुरंत पहचान लेते हैं और ईमेल स्पैम में डाल देते हैं। इसलिए <strong>Clean & Natural Mode</strong> सबसे सुरक्षित और बेस्ट है।
+                  </p>
+                </div>
+
+                <div className="bg-white/80 backdrop-blur-xs p-3 rounded-lg border border-emerald-100/60 text-xs">
+                  <span className="font-bold text-emerald-800 block mb-1">2. Speed Delay 10s-15s रखें</span>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    लगातार तेज़ गति से ईमेल भेजने पर गूगल आपके ईमेल ब्लॉक या स्पैम कर देता है। सुरक्षित डिलीवरी के लिए नीचे से <strong>Speed Delay को 10-15 सेकंड</strong> पर सेट करें।
+                  </p>
+                </div>
+
+                <div className="bg-white/80 backdrop-blur-xs p-3 rounded-lg border border-emerald-100/60 text-xs">
+                  <span className="font-bold text-emerald-800 block mb-1">3. Spintax का उपयोग करें</span>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    हर क्लाइंट को एक जैसा मैसेज न भेजें। अपने विषय (Subject) या मैसेज में <code>{"{Hi|Hello|Hey}"}</code> जैसे विकल्पों का उपयोग करें ताकि हर क्लाइंट को एक अलग और यूनीक मैसेज मिले।
+                  </p>
+                </div>
+
+                <div className="bg-white/80 backdrop-blur-xs p-3 rounded-lg border border-emerald-100/60 text-xs">
+                  <span className="font-bold text-emerald-800 block mb-1">4. स्पैम कीवर्ड्स से बचें</span>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    अपने मैसेज में <em>free, cash, money, earn, win, bitcoin, cheap</em> जैसे शब्दों का सीधे उपयोग न करें। इन्हें बदलने के लिए नीचे से <strong>Synonym Optimizer</strong> भी चुन सकते हैं।
+                  </p>
+                </div>
+              </div>
+            </div>
             
             {/* 2-Column Grid matching the requested user layout structure */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -744,15 +767,15 @@ export default function App() {
                   <input
                     type="range"
                     min={2}
-                    max={20}
+                    max={25}
                     value={delaySeconds}
                     onChange={(e) => setDelaySeconds(parseInt(e.target.value))}
                     className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                   />
                   <div className="flex justify-between text-[10px] text-slate-400">
                     <span>2s (Fast)</span>
-                    <span className="text-emerald-600 font-semibold">Recommended: 5s - 10s</span>
-                    <span>20s (Super Safe)</span>
+                    <span className="text-emerald-600 font-semibold">Recommended: 10s - 15s</span>
+                    <span>25s (Super Safe)</span>
                   </div>
                 </div>
 
@@ -853,7 +876,7 @@ export default function App() {
                 {/* Interactive Spintax Guide for High Spam Protection */}
                 <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 text-xs space-y-2">
                   <p className="font-bold text-indigo-900 flex items-center gap-1">
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-500 animate-spin" />
                     हाई-लेवल स्पैम प्रोटेक्शन: Spintax का उपयोग करें
                   </p>
                   <p className="text-[11px] text-slate-600 leading-relaxed">
@@ -870,7 +893,7 @@ export default function App() {
             {/* Spam Protection Status Block */}
             <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-3">
               <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                <ShieldCheck className="w-4 h-4 text-emerald-500 animate-bounce" />
                 Active Inbox Delivery Armour
               </h3>
               
@@ -898,7 +921,7 @@ export default function App() {
             <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                  <Activity className="w-4 h-4 text-indigo-500" />
+                  <Activity className="w-4 h-4 text-indigo-500 animate-pulse" />
                   Domain & Inbox Delivery Health Guide
                 </h3>
                 <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-bold border border-emerald-100 flex items-center gap-0.5">
@@ -925,7 +948,6 @@ export default function App() {
                       </div>
 
                       <div className="space-y-2.5">
-                        {/* SPF Record */}
                         <div className="space-y-1">
                           <div className="flex justify-between items-center text-[10.5px]">
                             <span className="font-bold text-slate-700">1. SPF Record (TXT)</span>
@@ -937,7 +959,6 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* DKIM Record */}
                         <div className="space-y-1">
                           <div className="flex justify-between items-center text-[10.5px]">
                             <span className="font-bold text-slate-700">2. DKIM Record (TXT)</span>
@@ -949,7 +970,6 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* DMARC Record */}
                         <div className="space-y-1">
                           <div className="flex justify-between items-center text-[10.5px]">
                             <span className="font-bold text-slate-700">3. DMARC Record (TXT)</span>
@@ -980,7 +1000,7 @@ export default function App() {
                         </p>
                         <ul className="list-disc pl-4 text-slate-600 space-y-1">
                           <li>केवल <strong>16-Digit App Password</strong> का उपयोग करें (अपना सामान्य लॉगिन पासवर्ड न भरें)।</li>
-                          <li>ईमेल भेजने की गति <strong>5 से 10 सेकंड</strong> प्रति ईमेल रखें ताकि जीमेल स्पैम बॉट एक्टिव न हो।</li>
+                          <li>ईमेल भेजने की गति <strong>10 से 15 सेकंड</strong> प्रति ईमेल रखें ताकि जीमेल स्पैम बॉट एक्टिव न हो।</li>
                           <li>हमारे द्वारा लागू की गई <strong>Spintax</strong> और <strong>ऑटो स्पैम कीवर्ड क्लीनर</strong> तकनीक आपके ईमेल को पूरी तरह सुरक्षित रखेगी।</li>
                         </ul>
                       </div>
