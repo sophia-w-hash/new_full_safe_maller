@@ -318,7 +318,7 @@ export default function App() {
       for (let i = 0; i < currentRecipients.length; i++) {
         if (currentRecipients[i].status === 'pending') {
           pendingTargets.push({ index: i, target: currentRecipients[i] });
-          if (pendingTargets.length === 8) break; // Batch of 8
+          if (pendingTargets.length === 9) break; // Batch of 9
         }
       }
       
