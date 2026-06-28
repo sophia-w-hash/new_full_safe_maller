@@ -787,6 +787,102 @@ export default function App() {
               </div>
             </div>
 
+            {/* Domain & Gmail Delivery Health Guide (SPF/DKIM/DMARC Setup) */}
+            <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                  <Activity className="w-4 h-4 text-indigo-500 animate-pulse" />
+                  Domain & Inbox Delivery Health Guide
+                </h3>
+                <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-bold border border-emerald-100 flex items-center gap-0.5">
+                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping" />
+                  Optimal Setup
+                </span>
+              </div>
+
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                ईमेल को सीधे <strong>Primary Inbox</strong> में भेजने के लिए आपके डोमेन का DNS कॉन्फ़िगरेशन बिल्कुल सही होना चाहिए। नीचे आपके डोमेन के लिए आवश्यक सेटिंग्स दी गई हैं:
+              </p>
+
+              {(() => {
+                if (!senderEmail || !senderEmail.includes('@')) return null;
+                const domain = senderEmail.split('@')[1];
+                const isCustomDomain = domain && domain.toLowerCase() !== 'gmail.com';
+
+                if (isCustomDomain) {
+                  return (
+                    <div className="space-y-3 pt-1">
+                      <div className="bg-indigo-50/50 p-2.5 rounded-lg border border-indigo-100 text-xs text-indigo-900 flex items-center justify-between">
+                        <span className="font-semibold">Detected Domain: <span className="font-mono text-indigo-600 underline">{domain}</span></span>
+                        <span className="text-[10px] font-bold text-indigo-600">Custom Domain Mode</span>
+                      </div>
+
+                      <div className="space-y-2.5">
+                        {/* SPF Record */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center text-[10.5px]">
+                            <span className="font-bold text-slate-700">1. SPF Record (TXT)</span>
+                            <span className="text-indigo-600 font-semibold text-[9px] uppercase">Highly Recommended</span>
+                          </div>
+                          <div className="bg-slate-50 p-2 rounded border border-slate-200 font-mono text-[10px] text-slate-600 space-y-1">
+                            <div><span className="text-slate-400">Host/Name:</span> @</div>
+                            <div className="break-all"><span className="text-slate-400">Value:</span> <code className="text-slate-800 font-bold">v=spf1 include:_spf.google.com ~all</code></div>
+                          </div>
+                        </div>
+
+                        {/* DKIM Record */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center text-[10.5px]">
+                            <span className="font-bold text-slate-700">2. DKIM Record (TXT)</span>
+                            <span className="text-indigo-600 font-semibold text-[9px] uppercase">Highly Recommended</span>
+                          </div>
+                          <div className="bg-slate-50 p-2 rounded border border-slate-200 font-mono text-[10px] text-slate-600 space-y-1">
+                            <div><span className="text-slate-400">Host/Name:</span> google._domainkey</div>
+                            <div className="break-all"><span className="text-slate-400">Value:</span> <code className="text-slate-800 font-bold">v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG...[Your unique Google DKIM key]</code></div>
+                          </div>
+                        </div>
+
+                        {/* DMARC Record */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center text-[10.5px]">
+                            <span className="font-bold text-slate-700">3. DMARC Record (TXT)</span>
+                            <span className="text-rose-600 font-semibold text-[9px] uppercase">Mandatory for Gmail 2024</span>
+                          </div>
+                          <div className="bg-slate-50 p-2 rounded border border-slate-200 font-mono text-[10px] text-slate-600 space-y-1">
+                            <div><span className="text-slate-400">Host/Name:</span> _dmarc</div>
+                            <div className="break-all"><span className="text-slate-400">Value:</span> <code className="text-slate-800 font-bold">v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc-reports@{domain}</code></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div className="space-y-3 pt-1">
+                      <div className="bg-indigo-50/50 p-2.5 rounded-lg border border-indigo-100 text-[11px] text-indigo-900 flex items-center justify-between">
+                        <span className="font-semibold">Standard Gmail Mode (@gmail.com)</span>
+                        <span className="text-[10px] font-bold text-indigo-600">No DNS Action Needed</span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 leading-relaxed">
+                        यदि आप सामान्य <strong>@gmail.com</strong> पते से भेज रहे हैं, तो गूगल स्वयं आपके SPF, DKIM और DMARC को प्रमाणित करता है। आपको अपने अंत पर कोई DNS रिकॉर्ड जोड़ने की आवश्यकता नहीं है! 
+                      </p>
+                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5 text-[11px]">
+                        <p className="font-bold text-slate-700 flex items-center gap-1">
+                          <Info className="w-3.5 h-3.5 text-indigo-500" />
+                          Gmail Inbox में ईमेल जाने की 100% गारंटी के लिए:
+                        </p>
+                        <ul className="list-disc pl-4 text-slate-600 space-y-1">
+                          <li>केवल <strong>16-Digit App Password</strong> का उपयोग करें (अपना सामान्य लॉगिन पासवर्ड न भरें)।</li>
+                          <li>ईमेल भेजने की गति <strong>5 से 10 सेकंड</strong> प्रति ईमेल रखें ताकि जीमेल स्पैम बॉट एक्टिव न हो।</li>
+                          <li>हमारे द्वारा लागू की गई <strong>Spintax</strong> और <strong>ऑटो स्पैम कीवर्ड क्लीनर</strong> तकनीक आपके ईमेल को पूरी तरह सुरक्षित रखेगी।</li>
+                        </ul>
+                      </div>
+                    </div>
+                  );
+                }
+              })()}
+            </div>
+
           </div>
 
           {/* Right Column (Live stats, list tracker) */}
