@@ -830,6 +830,41 @@ export default function App() {
                 </p>
               </div>
 
+            </div>
+
+            {/* Row 4: Send & All Logout Controls */}
+              <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-slate-100">
+                {!isSending ? (
+                  <button
+                    type="button"
+                    onClick={handleStartSending}
+                    disabled={!senderEmail || !appPassword || !recipientsInput}
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-100 disabled:text-slate-400 text-white font-bold py-3.5 px-6 rounded-xl text-xs transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-indigo-200"
+                  >
+                    <Send className="w-4 h-4" />
+                    Send (बल्क ईमेल शुरू करें)
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handlePauseSending}
+                    className="flex-1 bg-amber-500 hover:bg-amber-400 text-white font-bold py-3.5 px-6 rounded-xl text-xs transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-amber-200"
+                  >
+                    <Pause className="w-4 h-4" />
+                    Pause Dispatcher
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleAllLogout}
+                  className="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold py-3.5 px-6 rounded-xl text-xs transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer border border-rose-200"
+                >
+                  <LogOut className="w-4 h-4" />
+                  All Logout (सब साफ़ करें)
+                </button>
+              </div>
+
               {/* Speed & Concurrency Inline Panel */}
               <div id="inline-speed-concurrency-control" className="mt-4 pt-4 border-t border-slate-100 space-y-4">
                 <div className="flex items-center gap-2">
@@ -978,41 +1013,6 @@ export default function App() {
                   </p>
                 </div>
               </div>
-
-            </div>
-
-            {/* Row 4: Send & All Logout Controls */}
-            <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-slate-100">
-              {!isSending ? (
-                <button
-                  type="button"
-                  onClick={handleStartSending}
-                  disabled={!senderEmail || !appPassword || !recipientsInput}
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-100 disabled:text-slate-400 text-white font-bold py-3.5 px-6 rounded-xl text-xs transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-indigo-200"
-                >
-                  <Send className="w-4 h-4" />
-                  Send (बल्क ईमेल शुरू करें)
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handlePauseSending}
-                  className="flex-1 bg-amber-500 hover:bg-amber-400 text-white font-bold py-3.5 px-6 rounded-xl text-xs transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-amber-200"
-                >
-                  <Pause className="w-4 h-4" />
-                  Pause Dispatcher
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={handleAllLogout}
-                className="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold py-3.5 px-6 rounded-xl text-xs transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer border border-rose-200"
-              >
-                <LogOut className="w-4 h-4" />
-                All Logout (सब साफ़ करें)
-              </button>
-            </div>
 
           </div>
         </section>
