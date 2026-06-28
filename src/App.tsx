@@ -25,7 +25,8 @@ import {
   Settings,
   ShieldCheck,
   Check,
-  RefreshCw
+  RefreshCw,
+  Zap
 } from 'lucide-react';
 import { MailSendStatus } from './types';
 
@@ -40,14 +41,15 @@ export default function App() {
   const [senderMode, setSenderMode] = useState<'single' | 'bulk'>((localStorage.getItem('senderMode') as 'single' | 'bulk') || 'single');
   const [bulkSendersInput, setBulkSendersInput] = useState(localStorage.getItem('bulkSendersInput') || '');
   const [subject, setSubject] = useState(localStorage.getItem('subject') || '{Quick question for|Regarding website potential of|Important update for} {{Name}}');
-  const [body, setBody] = useState(localStorage.getItem('body') || `<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-  <p>{Hi|Hello|Greetings} <strong>{{Name}}</strong>,</p>
-  <p>{Hope you are doing well|Trust this email finds you well|Hope you're having a productive week}.</p>
-  <p>{While reviewing online opportunities, I came across your business|I recently visited your website and found it has excellent potential}. Although it is currently not on the first-page listings, your website has a strong base for visitors. I'd like to email the custom quote we prepared for you.</p>
-  <p>{Could you please let me know if this is the best email to send it to?|Would it be alright if I share the details with you?|Let me know if you would be interested in taking a look}.</p>
-  <p>{Best regards|Warm regards|Sincerely},<br><strong>{{SenderName}}</strong></p>
-</div>`);
+  const [body, setBody] = useState(localStorage.getItem('body') || `<p>{Hi|Hello|Greetings} <strong>{{Name}}</strong>,</p>
+<p>{Hope you are doing well|Trust this email finds you well|Hope you're having a productive week}.</p>
+<p>{While reviewing online opportunities, I came across your business|I recently visited your website and found it has excellent potential}. Although it is currently not on the first-page listings, your website has a strong base for visitors. I'd like to email the custom quote we prepared for you.</p>
+<p>{Could you please let me know if this is the best email to send it to?|Would it be alright if I share the details with you?|Let me know if you would be interested in taking a look}.</p>
+<p>{Best regards|Warm regards|Sincerely},<br><strong>{{SenderName}}</strong></p>`);
   const [recipientsInput, setRecipientsInput] = useState(localStorage.getItem('recipientsInput') || '');
+  const [concurrency, setConcurrency] = useState(() => {
+    return parseInt(localStorage.getItem('concurrency') || '1');
+  });
 
   // Persist inputs to localStorage
   useEffect(() => {
@@ -60,7 +62,8 @@ export default function App() {
     localStorage.setItem('body', body);
     localStorage.setItem('recipientsInput', recipientsInput);
     localStorage.setItem('deliveryMode', deliveryMode);
-  }, [senderName, senderEmail, appPassword, senderMode, bulkSendersInput, subject, body, recipientsInput, deliveryMode]);
+    localStorage.setItem('concurrency', concurrency.toString());
+  }, [senderName, senderEmail, appPassword, senderMode, bulkSendersInput, subject, body, recipientsInput, deliveryMode, concurrency]);
 
   // Bulk active sending state
   const [recipients, setRecipients] = useState<MailSendStatus[]>([]);
@@ -91,6 +94,7 @@ export default function App() {
   const senderModeRef = useRef(senderMode);
   const bulkSendersInputRef = useRef(bulkSendersInput);
   const deliveryModeRef = useRef(deliveryMode);
+  const concurrencyRef = useRef(concurrency);
 
   // Active/locked credentials for the currently running dispatch session
   const activeSenderEmailRef = useRef('');
@@ -100,11 +104,22 @@ export default function App() {
   const activeBodyRef = useRef('');
   const activeAddUniqueIdToSubjectRef = useRef(false);
   const activeDeliveryModeRef = useRef<'clean' | 'optimized_synonyms' | 'obfuscate'>('clean');
+  const activeConcurrencyRef = useRef(1);
 
   // Keep references in sync with state changes
   useEffect(() => { recipientsRef.current = recipients; }, [recipients]);
   useEffect(() => { delaySecondsRef.current = delaySeconds; }, [delaySeconds]);
   useEffect(() => { randomizeDelayRef.current = randomizeDelay; }, [randomizeDelay]);
+  useEffect(() => { subjectRef.current = subject; }, [subject]);
+  useEffect(() => { bodyRef.current = body; }, [body]);
+  useEffect(() => { addUniqueIdToSubjectRef.current = addUniqueIdToSubject; }, [addUniqueIdToSubject]);
+  useEffect(() => { senderEmailRef.current = senderEmail; }, [senderEmail]);
+  useEffect(() => { appPasswordRef.current = appPassword; }, [appPassword]);
+  useEffect(() => { senderNameRef.current = senderName; }, [senderName]);
+  useEffect(() => { senderModeRef.current = senderMode; }, [senderMode]);
+  useEffect(() => { bulkSendersInputRef.current = bulkSendersInput; }, [bulkSendersInput]);
+  useEffect(() => { deliveryModeRef.current = deliveryMode; }, [deliveryMode]);
+  useEffect(() => { concurrencyRef.current = concurrency; }, [concurrency]);
   useEffect(() => { subjectRef.current = subject; }, [subject]);
   useEffect(() => { bodyRef.current = body; }, [body]);
   useEffect(() => { addUniqueIdToSubjectRef.current = addUniqueIdToSubject; }, [addUniqueIdToSubject]);
@@ -250,6 +265,70 @@ export default function App() {
     }
   };
 
+  // Clean & Fix Template (Spam Buster client-side tool)
+  const runSpamBuster = () => {
+    const spamMap: { [key: string]: string } = {
+      "free": "complimentary",
+      "guaranteed": "assured",
+      "100% satisfied": "fully satisfied",
+      "earn money": "generate income",
+      "make money": "grow income",
+      "risk-free": "secure",
+      "winner": "finalist",
+      "cash": "funds",
+      "millions": "substantial resources",
+      "crypto": "digital assets",
+      "bitcoin": "blockchain asset",
+      "buy now": "get access",
+      "click here": "explore details",
+      "income": "earnings",
+      "marketing": "outreach",
+      "sales": "promotional",
+      "cheap": "affordable",
+      "seo": "online visibility",
+      "google first page": "search ranking",
+      "rank": "position",
+      "offer": "opportunity",
+      "price": "cost",
+      "buy": "acquire",
+      "click": "visit",
+      "link": "page"
+    };
+
+    let subjectCleaned = subject;
+    let bodyCleaned = body;
+    let count = 0;
+
+    for (const [word, replacement] of Object.entries(spamMap)) {
+      const regex = new RegExp(`\\b${word}\\b`, 'gi');
+      
+      const subMatches = subjectCleaned.match(regex);
+      if (subMatches) count += subMatches.length;
+      subjectCleaned = subjectCleaned.replace(regex, replacement);
+
+      const bodyMatches = bodyCleaned.match(regex);
+      if (bodyMatches) count += bodyMatches.length;
+      bodyCleaned = bodyCleaned.replace(regex, replacement);
+    }
+
+    if (count > 0) {
+      setSubject(subjectCleaned);
+      setBody(bodyCleaned);
+      addLog(`✨ Spam Buster: Replaced ${count} high-risk words with highly-deliverable synonyms.`);
+      alert(`🎉 Done! Replaced ${count} potential spam words with safe professional synonyms.`);
+    } else {
+      alert("✅ Perfect! No high-risk spam keywords detected in your subject or body.");
+    }
+  };
+
+  const resetToCleanTemplate = () => {
+    if (window.confirm("क्या आप मैसेज और विषय को 100% इनबॉक्स-सुरक्षित टेम्पलेट पर रीसेट करना चाहते हैं? इसमें कोई बाहरी बॉर्डर या फालतू लाइन्स नहीं होंगी।")) {
+      setSubject("{Quick question for|Regarding website potential of|Important update for} {{Name}}");
+      setBody(`<p>{Hi|Hello|Greetings} <strong>{{Name}}</strong>,</p>\n<p>{Hope you are doing well|Trust this email finds you well|Hope you're having a productive week}.</p>\n<p>{While reviewing online opportunities, I came across your business|I recently visited your website and found it has excellent potential}. Although it is currently not on the first-page listings, your website has a strong base for visitors. I'd like to email the custom quote we prepared for you.</p>\n<p>{Could you please let me know if this is the best email to send it to?|Would it be alright if I share the details with you?|Let me know if you would be interested in taking a look}.</p>\n<p>{Best regards|Warm regards|Sincerely},<br><strong>{{SenderName}}</strong></p>`);
+      addLog("🔄 Reset to ultra-clean HTML template (no borders, no extra lines).");
+    }
+  };
+
   // Clear All fields (All Logout)
   const handleAllLogout = () => {
     if (window.confirm('क्या आप सच में सभी क्रेडेंशियल्स, सेटिंग्स और प्राप्तकर्ताओं की सूची को मिटाना (Clear) चाहते हैं?')) {
@@ -259,13 +338,11 @@ export default function App() {
       setSenderMode('single');
       setBulkSendersInput('');
       setSubject('{Quick question for|Regarding website potential of|Important update for} {{Name}}');
-      setBody(`<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-  <p>{Hi|Hello|Greetings} <strong>{{Name}}</strong>,</p>
-  <p>{Hope you are doing well|Trust this email finds you well|Hope you're having a productive week}.</p>
-  <p>{While reviewing online opportunities, I came across your business|I recently visited your website and found it has excellent potential}. Although it is currently not on the first-page listings, your website has a strong base for visitors. I'd like to email the custom quote we prepared for you.</p>
-  <p>{Could you please let me know if this is the best email to send it to?|Would it be alright if I share the details with you?|Let me know if you would be interested in taking a look}.</p>
-  <p>{Best regards|Warm regards|Sincerely},<br><strong>{{SenderName}}</strong></p>
-</div>`);
+      setBody(`<p>{Hi|Hello|Greetings} <strong>{{Name}}</strong>,</p>
+<p>{Hope you are doing well|Trust this email finds you well|Hope you're having a productive week}.</p>
+<p>{While reviewing online opportunities, I came across your business|I recently visited your website and found it has excellent potential}. Although it is currently not on the first-page listings, your website has a strong base for visitors. I'd like to email the custom quote we prepared for you.</p>
+<p>{Could you please let me know if this is the best email to send it to?|Would it be alright if I share the details with you?|Let me know if you would be interested in taking a look}.</p>
+<p>{Best regards|Warm regards|Sincerely},<br><strong>{{SenderName}}</strong></p>`);
       setRecipientsInput('');
       setRecipients([]);
       setBulkLog([]);
@@ -313,14 +390,15 @@ export default function App() {
         return;
       }
 
-      // Find up to 8 pending recipients using the ref to avoid stale state
+      // Find up to activeConcurrencyRef.current pending recipients using the ref to avoid stale state
       const currentRecipients = recipientsRef.current;
       const pendingTargets: { index: number; target: MailSendStatus }[] = [];
+      const currentConcurrency = activeConcurrencyRef.current || 1;
       
       for (let i = 0; i < currentRecipients.length; i++) {
         if (currentRecipients[i].status === 'pending') {
           pendingTargets.push({ index: i, target: currentRecipients[i] });
-          if (pendingTargets.length === 8) break; // Batch of 8
+          if (pendingTargets.length === currentConcurrency) break; // Batch of currentConcurrency size
         }
       }
       
@@ -488,6 +566,7 @@ export default function App() {
     activeBodyRef.current = body;
     activeAddUniqueIdToSubjectRef.current = addUniqueIdToSubject;
     activeDeliveryModeRef.current = deliveryMode;
+    activeConcurrencyRef.current = concurrency;
 
     // Set lists synchronously in state and references immediately to prevent race conditions
     setRecipients(list);
@@ -688,22 +767,44 @@ export default function App() {
                   placeholder="Write message HTML or plain text here..."
                   className="w-full h-32 bg-white text-slate-950 border border-slate-200 rounded-xl p-3 text-xs font-mono placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition leading-relaxed resize-none shadow-xs"
                 />
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  <span className="text-[10px] text-slate-400 self-center uppercase font-mono mr-1">Insert Placeholder:</span>
-                  <button 
-                    type="button" 
-                    onClick={() => setBody(prev => prev + ' {{Name}}')} 
-                    className="text-[10px] bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded text-slate-600 font-mono transition"
-                  >
-                    {"{{Name}}"}
-                  </button>
-                  <button 
-                    type="button" 
-                    onClick={() => setBody(prev => prev + ' {{SenderName}}')} 
-                    className="text-[10px] bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded text-slate-600 font-mono transition"
-                  >
-                    {"{{SenderName}}"}
-                  </button>
+                <div className="flex flex-wrap items-center justify-between gap-2 mt-2 pt-1.5 border-t border-slate-100">
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className="text-[10px] text-slate-400 self-center uppercase font-mono mr-1">Insert:</span>
+                    <button 
+                      type="button" 
+                      onClick={() => setBody(prev => prev + ' {{Name}}')} 
+                      className="text-[10px] bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded text-slate-600 font-mono transition"
+                    >
+                      {"{{Name}}"}
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => setBody(prev => prev + ' {{SenderName}}')} 
+                      className="text-[10px] bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded text-slate-600 font-mono transition"
+                    >
+                      {"{{SenderName}}"}
+                    </button>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={runSpamBuster}
+                      className="text-[10.5px] bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold border border-amber-200 px-2.5 py-1 rounded-lg transition flex items-center gap-1 shadow-xs"
+                      title="विषय और बॉडी में से स्पैम शब्दों को हटाकर सुरक्षित पर्यायवाची शब्द लिखें"
+                    >
+                      <Zap className="w-3 h-3 text-amber-500 fill-amber-500" />
+                      Spam Buster (स्पैम हटाओ)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={resetToCleanTemplate}
+                      className="text-[10.5px] bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold border border-emerald-200 px-2.5 py-1 rounded-lg transition flex items-center gap-1 shadow-xs"
+                      title="100% इनबॉक्स-सुरक्षित टेम्पलेट पर रीसेट करें"
+                    >
+                      <Check className="w-3 h-3 text-emerald-500" />
+                      Clean Template (साफ़ टेम्पलेट)
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -790,17 +891,51 @@ export default function App() {
                   </div>
                   <input
                     type="range"
-                    min={2}
+                    min={1}
                     max={20}
                     value={delaySeconds}
                     onChange={(e) => setDelaySeconds(parseInt(e.target.value))}
                     className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                   />
                   <div className="flex justify-between text-[10px] text-slate-400">
-                    <span>2s (Fast)</span>
-                    <span className="text-emerald-600 font-semibold">Recommended: 5s - 10s</span>
+                    <span>1s (Super Fast)</span>
+                    <span className="text-emerald-600 font-semibold">Recommended: 4s - 8s</span>
                     <span>20s (Super Safe)</span>
                   </div>
+                </div>
+
+                {/* Sending Concurrency (Threads) */}
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <div className="flex justify-between items-center text-xs font-semibold text-slate-700">
+                    <span className="flex items-center gap-1">
+                      <Zap className="w-4 h-4 text-amber-500" />
+                      Sending Threads / Concurrency (थ्रेड्स - एक साथ कितने ईमेल भेजें)
+                    </span>
+                    <span className={`font-bold px-2 py-0.5 rounded border font-mono text-[11px] ${
+                      concurrency === 1 
+                        ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
+                        : concurrency <= 3 
+                          ? 'text-indigo-700 bg-indigo-50 border-indigo-200' 
+                          : 'text-amber-700 bg-amber-50 border-amber-200'
+                    }`}>
+                      {concurrency === 1 ? '1 Thread (Safe - 100% Inbox)' : `${concurrency} Threads (Parallel)`}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={8}
+                    value={concurrency}
+                    onChange={(e) => setConcurrency(parseInt(e.target.value))}
+                    className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-400">
+                    <span className="text-emerald-600 font-bold">1 Thread (Inbox Perfect)</span>
+                    <span className="text-amber-600 font-bold">8 Threads (Fastest Speed)</span>
+                  </div>
+                  <p className="text-[10.5px] text-slate-500 leading-relaxed pt-0.5">
+                    <strong>1 थ्रेड (1-by-1)</strong> ईमेल भेजने का सबसे सुरक्षित तरीका है जो 100% इनबॉक्स डिलीवरी देता है। अगर आप अत्यधिक तेज़ स्पीड चाहते हैं, तो थ्रेड्स बढ़ाएं।
+                  </p>
                 </div>
 
                 {/* Additional anti-spam toggles */}
