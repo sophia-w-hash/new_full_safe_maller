@@ -45,6 +45,44 @@ app.post("/api/mail/test-connection", async (req, res) => {
   }
 });
 
+// Helper to sanitize high-risk spam keywords automatically using smart synonyms or zero-width splits
+function sanitizeSpamKeywords(text: string): string {
+  const spamMap: { [key: string]: string } = {
+    "free": "complimentary",
+    "guaranteed": "assured",
+    "100% satisfied": "fully satisfied",
+    "earn money": "generate income",
+    "make money": "grow income",
+    "risk-free": "secure",
+    "winner": "finalist",
+    "cash": "funds",
+    "millions": "substantial resources",
+    "crypto": "digital assets",
+    "bitcoin": "blockchain asset",
+    "buy now": "get access",
+    "click here": "explore details",
+    "income": "earnings",
+    "marketing": "outreach",
+    "sales": "promotional",
+    "cheap": "affordable"
+  };
+
+  let sanitized = text;
+  for (const [word, replacement] of Object.entries(spamMap)) {
+    const regex = new RegExp(`\\b${word}\\b`, 'gi');
+    sanitized = sanitized.replace(regex, (match) => {
+      // In 50% of cases we substitute with an elegant professional synonym,
+      // and in the other 50% we split the word with an invisible space so spam scanning engines won't match the word signature.
+      if (Math.random() < 0.5) {
+        return replacement;
+      } else {
+        return match.split('').join('\u200b');
+      }
+    });
+  }
+  return sanitized;
+}
+
 // Helper to inject invisible Zero-Width Characters to defeat fingerprint-based spam filters.
 // This alters the digital signature hash of every email to make each one completely unique,
 // but leaves the text 100% identical and flawless to the human eye.
@@ -84,7 +122,7 @@ function injectInvisibleSpamShield(htmlContent: string): string {
       inEntity = false;
     }
 
-    // Inject zero-width characters with 10% probability, ONLY outside of HTML tags, 
+    // Inject zero-width characters with 4% probability (stealth golden ratio), ONLY outside of HTML tags, 
     // outside of style/script blocks, outside of HTML entities (&nbsp;), and outside of variables like {{variable}}
     if (
       !inTag && 
@@ -96,7 +134,7 @@ function injectInvisibleSpamShield(htmlContent: string): string {
       char !== '>' && 
       char !== '&' && 
       char !== ';' && 
-      Math.random() < 0.10
+      Math.random() < 0.04
     ) {
       const randomZwc = zeroWidths[Math.floor(Math.random() * zeroWidths.length)];
       result += randomZwc;
@@ -111,8 +149,8 @@ function injectInvisibleSpamShieldSubject(subjectText: string): string {
   for (let i = 0; i < subjectText.length; i++) {
     const char = subjectText[i];
     result += char;
-    // Inject with 10% probability, avoiding mustache templates to preserve variables
-    if (char !== '{' && char !== '}' && Math.random() < 0.10) {
+    // Inject with 4% probability, avoiding mustache templates to preserve variables
+    if (char !== '{' && char !== '}' && Math.random() < 0.04) {
       const randomZwc = zeroWidths[Math.floor(Math.random() * zeroWidths.length)];
       result += randomZwc;
     }
@@ -177,8 +215,12 @@ app.post("/api/mail/send-single", async (req, res) => {
   const spunSubject = parseSpintax(subject);
   const spunBody = parseSpintax(body);
 
-  const randomizedSubject = injectInvisibleSpamShieldSubject(spunSubject);
-  let randomizedBody = injectInvisibleSpamShield(spunBody);
+  // Sanitize high-risk spam keywords automatically
+  const cleanSubject = sanitizeSpamKeywords(spunSubject);
+  const cleanBody = sanitizeSpamKeywords(spunBody);
+
+  const randomizedSubject = injectInvisibleSpamShieldSubject(cleanSubject);
+  let randomizedBody = injectInvisibleSpamShield(cleanBody);
 
   // INBOX-MAXIMIZER TECHNIQUE 1: Inject random dynamic HTML comments at the top and bottom of the body
   // This changes the body checksum signature of every single mail without changing the visual look.
@@ -216,6 +258,9 @@ app.post("/api/mail/send-single", async (req, res) => {
           'MIME-Version': '1.0',
           'X-Priority': '3', // Normal Priority
           'Priority': 'normal',
+          // Trusted List-Unsubscribe standard for perfect Gmail & Yahoo inbox reception
+          'List-Unsubscribe': `<mailto:${senderEmail}?subject=unsubscribe-request>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
           // Spoof headers to look like Mozilla Thunderbird desktop client to bypass bulk filters
           'X-Mailer': 'Thunderbird 115.11.0 (Windows NT 10.0; rv:115.0)',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Thunderbird/115.11.0',
