@@ -220,22 +220,7 @@ app.post("/api/mail/send-single", async (req, res) => {
     finalBody = injectInvisibleSpamShield(cleanBdy);
   }
 
-  // INBOX-MAXIMIZER TECHNIQUE 1: Inject random dynamic HTML comments at the top and bottom of the body
-  // This changes the body checksum signature of every single mail without changing the visual look.
-  const randomSpamToken = Math.random().toString(36).substring(2, 15);
-  finalBody = `<!-- ID: ${randomSpamToken} -->\n${finalBody}\n<!-- SECURE_TOKEN: ${Math.floor(100000 + Math.random() * 900000)} -->`;
-
-  const plainTextAlternative = cleanHtmlToText(finalBody);
-
-  // INBOX-MAXIMIZER TECHNIQUE 2: Generate highly authentic Domain-Aligned Message-ID to bypass Nodemailer default headers
-  const senderDomain = senderEmail.split('@')[1] || 'gmail.com';
-  const timeStamp = Date.now();
-  const randHex = Math.floor(1000000000 + Math.random() * 9000000000).toString(16).toUpperCase();
-  const alignedMessageId = `<${randHex}.${timeStamp}@${senderDomain}>`;
-
-  // INBOX-MAXIMIZER TECHNIQUE 3: Dynamic Date header mimicking human desktop client latency offsets
-  const simulatedOffsetMinutes = Math.floor(Math.random() * 5); // 0-4 minutes lag offset
-  const simulatedDate = new Date(Date.now() - (simulatedOffsetMinutes * 60 * 1000));
+  const plainTextAlternative = cleanHtmlToText(spunBody);
 
   // Bulletproof SMTP send retry loop with Exponential Backoff
   let attempts = 0;
@@ -250,18 +235,13 @@ app.post("/api/mail/send-single", async (req, res) => {
         subject: finalSubject,
         html: finalBody,
         text: plainTextAlternative, // Multi-part alternative MIME to heavily reduce spam score
-        messageId: alignedMessageId, // Real aligned header
-        date: simulatedDate, // Simulated realistic date sending pattern
         headers: {
           'MIME-Version': '1.0',
           'X-Priority': '3', // Normal Priority
           'Priority': 'normal',
-          // Spoof headers to look like Mozilla Thunderbird desktop client to bypass bulk filters
-          'X-Mailer': 'Thunderbird 115.11.0 (Windows NT 10.0; rv:115.0)',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Thunderbird/115.11.0',
-          'X-Accept-Language': 'en-US, en',
-          'Content-Language': 'en-US',
-          'Importance': 'Normal'
+          'Importance': 'Normal',
+          'List-Unsubscribe': `<mailto:${senderEmail}?subject=Unsubscribe:${recipientEmail}>`,
+          'Precedence': 'bulk'
         }
       });
 
