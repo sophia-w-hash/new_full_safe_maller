@@ -45,7 +45,7 @@ app.post("/api/mail/test-connection", async (req, res) => {
   }
 });
 
-// Helper to sanitize high-risk spam keywords automatically using smart synonyms or zero-width splits
+// Helper to sanitize high-risk spam keywords automatically using safe, elegant synonyms (zero-width characters removed to prevent AI filter triggers)
 function sanitizeSpamKeywords(text: string): string {
   const spamMap: { [key: string]: string } = {
     "free": "complimentary",
@@ -70,22 +70,12 @@ function sanitizeSpamKeywords(text: string): string {
   let sanitized = text;
   for (const [word, replacement] of Object.entries(spamMap)) {
     const regex = new RegExp(`\\b${word}\\b`, 'gi');
-    sanitized = sanitized.replace(regex, (match) => {
-      // In 50% of cases we substitute with an elegant professional synonym,
-      // and in the other 50% we split the word with an invisible space so spam scanning engines won't match the word signature.
-      if (Math.random() < 0.5) {
-        return replacement;
-      } else {
-        return match.split('').join('\u200b');
-      }
-    });
+    sanitized = sanitized.replace(regex, replacement);
   }
   return sanitized;
 }
 
-// Helper to inject invisible Zero-Width Characters to defeat fingerprint-based spam filters.
-// This alters the digital signature hash of every email to make each one completely unique,
-// but leaves the text 100% identical and flawless to the human eye.
+// Helper to inject invisible Zero-Width Characters (legacy mode - not recommended for modern Gmail)
 function injectInvisibleSpamShield(htmlContent: string): string {
   const zeroWidths = ["\u200b", "\u200c", "\u200d"];
   let result = "";
@@ -122,7 +112,7 @@ function injectInvisibleSpamShield(htmlContent: string): string {
       inEntity = false;
     }
 
-    // Inject zero-width characters with 4% probability (stealth golden ratio), ONLY outside of HTML tags, 
+    // Inject zero-width characters with 4% probability, ONLY outside of HTML tags, 
     // outside of style/script blocks, outside of HTML entities (&nbsp;), and outside of variables like {{variable}}
     if (
       !inTag && 
@@ -195,7 +185,7 @@ function cleanHtmlToText(html: string): string {
 
 // API to send a single email (for bulk execution)
 app.post("/api/mail/send-single", async (req, res) => {
-  const { senderEmail, appPassword, senderName, recipientEmail, subject, body } = req.body;
+  const { senderEmail, appPassword, senderName, recipientEmail, subject, body, deliveryMode = "clean" } = req.body;
 
   if (!senderEmail || !appPassword || !recipientEmail || !subject || !body) {
     return res.status(400).json({ success: false, message: "Missing required fields" });
@@ -211,23 +201,31 @@ app.post("/api/mail/send-single", async (req, res) => {
     },
   });
 
-  // Apply real-time cryptographic/anti-fingerprinting randomized spam shields
+  // Expand spintax (e.g. {Hello|Hi|Greetings})
   const spunSubject = parseSpintax(subject);
   const spunBody = parseSpintax(body);
 
-  // Sanitize high-risk spam keywords automatically
-  const cleanSubject = sanitizeSpamKeywords(spunSubject);
-  const cleanBody = sanitizeSpamKeywords(spunBody);
+  let finalSubject = spunSubject;
+  let finalBody = spunBody;
 
-  const randomizedSubject = injectInvisibleSpamShieldSubject(cleanSubject);
-  let randomizedBody = injectInvisibleSpamShield(cleanBody);
+  // Process based on chosen Delivery Optimization Mode
+  if (deliveryMode === "optimized_synonyms") {
+    finalSubject = sanitizeSpamKeywords(spunSubject);
+    finalBody = sanitizeSpamKeywords(spunBody);
+  } else if (deliveryMode === "obfuscate") {
+    // Obfuscate using zero-width characters (Legacy mode - warn user about modern AI spam filters)
+    const cleanSub = sanitizeSpamKeywords(spunSubject);
+    const cleanBdy = sanitizeSpamKeywords(spunBody);
+    finalSubject = injectInvisibleSpamShieldSubject(cleanSub);
+    finalBody = injectInvisibleSpamShield(cleanBdy);
+  }
 
   // INBOX-MAXIMIZER TECHNIQUE 1: Inject random dynamic HTML comments at the top and bottom of the body
   // This changes the body checksum signature of every single mail without changing the visual look.
   const randomSpamToken = Math.random().toString(36).substring(2, 15);
-  randomizedBody = `<!-- ID: ${randomSpamToken} -->\n${randomizedBody}\n<!-- SECURE_TOKEN: ${Math.floor(100000 + Math.random() * 900000)} -->`;
+  finalBody = `<!-- ID: ${randomSpamToken} -->\n${finalBody}\n<!-- SECURE_TOKEN: ${Math.floor(100000 + Math.random() * 900000)} -->`;
 
-  const plainTextAlternative = cleanHtmlToText(randomizedBody);
+  const plainTextAlternative = cleanHtmlToText(finalBody);
 
   // INBOX-MAXIMIZER TECHNIQUE 2: Generate highly authentic Domain-Aligned Message-ID to bypass Nodemailer default headers
   const senderDomain = senderEmail.split('@')[1] || 'gmail.com';
@@ -249,8 +247,8 @@ app.post("/api/mail/send-single", async (req, res) => {
       const info = await transporter.sendMail({
         from: senderName ? `"${senderName}" <${senderEmail}>` : senderEmail,
         to: recipientEmail,
-        subject: randomizedSubject,
-        html: randomizedBody,
+        subject: finalSubject,
+        html: finalBody,
         text: plainTextAlternative, // Multi-part alternative MIME to heavily reduce spam score
         messageId: alignedMessageId, // Real aligned header
         date: simulatedDate, // Simulated realistic date sending pattern
@@ -258,9 +256,6 @@ app.post("/api/mail/send-single", async (req, res) => {
           'MIME-Version': '1.0',
           'X-Priority': '3', // Normal Priority
           'Priority': 'normal',
-          // Trusted List-Unsubscribe standard for perfect Gmail & Yahoo inbox reception
-          'List-Unsubscribe': `<mailto:${senderEmail}?subject=unsubscribe-request>`,
-          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
           // Spoof headers to look like Mozilla Thunderbird desktop client to bypass bulk filters
           'X-Mailer': 'Thunderbird 115.11.0 (Windows NT 10.0; rv:115.0)',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Thunderbird/115.11.0',
