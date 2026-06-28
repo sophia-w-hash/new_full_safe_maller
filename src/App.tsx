@@ -31,6 +31,9 @@ import { MailSendStatus } from './types';
 
 export default function App() {
   // Inputs matching user's layout structure
+  const [deliveryMode, setDeliveryMode] = useState<'clean' | 'optimized_synonyms' | 'obfuscate'>(
+    (localStorage.getItem('deliveryMode') as any) || 'clean'
+  );
   const [senderName, setSenderName] = useState(localStorage.getItem('senderName') || '');
   const [senderEmail, setSenderEmail] = useState(localStorage.getItem('senderEmail') || '');
   const [appPassword, setAppPassword] = useState(localStorage.getItem('appPassword') || '');
@@ -55,7 +58,8 @@ export default function App() {
     localStorage.setItem('subject', subject);
     localStorage.setItem('body', body);
     localStorage.setItem('recipientsInput', recipientsInput);
-  }, [senderName, senderEmail, appPassword, senderMode, bulkSendersInput, subject, body, recipientsInput]);
+    localStorage.setItem('deliveryMode', deliveryMode);
+  }, [senderName, senderEmail, appPassword, senderMode, bulkSendersInput, subject, body, recipientsInput, deliveryMode]);
 
   // Bulk active sending state
   const [recipients, setRecipients] = useState<MailSendStatus[]>([]);
@@ -64,6 +68,7 @@ export default function App() {
   const [delaySeconds, setDelaySeconds] = useState(6); // default to 6 seconds for safer delivery
   const [randomizeDelay, setRandomizeDelay] = useState(true); // default to true for human-like pattern
   const [addUniqueIdToSubject, setAddUniqueIdToSubject] = useState(false); // FALSE by default so no extra words are added unless manually checked
+  
   
   // Connection Test & Logs State
   const [testingConnection, setTestingConnection] = useState(false);
@@ -84,6 +89,7 @@ export default function App() {
   const senderNameRef = useRef(senderName);
   const senderModeRef = useRef(senderMode);
   const bulkSendersInputRef = useRef(bulkSendersInput);
+  const deliveryModeRef = useRef(deliveryMode);
 
   // Active/locked credentials for the currently running dispatch session
   const activeSenderEmailRef = useRef('');
@@ -92,6 +98,7 @@ export default function App() {
   const activeSubjectRef = useRef('');
   const activeBodyRef = useRef('');
   const activeAddUniqueIdToSubjectRef = useRef(false);
+  const activeDeliveryModeRef = useRef<'clean' | 'optimized_synonyms' | 'obfuscate'>('clean');
 
   // Keep references in sync with state changes
   useEffect(() => { recipientsRef.current = recipients; }, [recipients]);
@@ -105,6 +112,7 @@ export default function App() {
   useEffect(() => { senderNameRef.current = senderName; }, [senderName]);
   useEffect(() => { senderModeRef.current = senderMode; }, [senderMode]);
   useEffect(() => { bulkSendersInputRef.current = bulkSendersInput; }, [bulkSendersInput]);
+  useEffect(() => { deliveryModeRef.current = deliveryMode; }, [deliveryMode]);
 
   interface ParsedSender {
     email: string;
@@ -397,7 +405,8 @@ export default function App() {
                 senderName: activeSenderName,
                 recipientEmail: target.email,
                 subject: parsedSubject,
-                body: parsedBody
+                body: parsedBody,
+                deliveryMode: activeDeliveryModeRef.current || deliveryModeRef.current
               })
             });
 
@@ -476,6 +485,7 @@ export default function App() {
     activeSubjectRef.current = subject;
     activeBodyRef.current = body;
     activeAddUniqueIdToSubjectRef.current = addUniqueIdToSubject;
+    activeDeliveryModeRef.current = deliveryMode;
 
     // Set lists synchronously in state and references immediately to prevent race conditions
     setRecipients(list);
@@ -745,7 +755,7 @@ export default function App() {
                 </div>
 
                 {/* Additional anti-spam toggles */}
-                <div className="space-y-2.5 pt-2">
+                <div className="space-y-4 pt-2">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
@@ -759,18 +769,84 @@ export default function App() {
                     </div>
                   </label>
 
-                  <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200 text-xs flex gap-2">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-bold text-emerald-800 flex items-center gap-1.5">
-                        Inbox Deliverability Shield Active
-                        <span className="bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider animate-pulse">AUTO-ON</span>
-                      </p>
-                      <p className="text-[11px] text-emerald-700 leading-relaxed mt-1">
-                        ईमेल फ़िल्टर (Gmail/Yahoo) को चकमा देने के लिए प्रत्येक ईमेल के भीतर <strong>अदृश्य जीरो-विड्थ कैरेक्टर</strong> मिलाए जाते हैं। इससे प्रत्येक ईमेल का डिजिटल सिग्नेचर (Fingerprint Hash) बिल्कुल अलग बनता है, लेकिन ग्राहक को ईमेल बिल्कुल साफ़ और वैसा ही दिखता है जैसा आपने लिखा है। 
-                      </p>
+                  {/* Delivery Optimization Selector */}
+                  <div className="space-y-2.5 pt-2 border-t border-slate-100">
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                      Delivery Optimization Mode (इनबॉक्स डिलीवरी मोड)
+                    </label>
+                    
+                    <div className="grid grid-cols-1 gap-2.5">
+                      {/* Option 1: Clean & Natural (Recommended) */}
+                      <div 
+                        onClick={() => setDeliveryMode('clean')}
+                        className={`p-3 rounded-xl border transition-all cursor-pointer flex gap-2.5 items-start ${
+                          deliveryMode === 'clean' 
+                            ? 'bg-emerald-50/70 border-emerald-300 ring-2 ring-emerald-500/10' 
+                            : 'bg-white border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className={`p-1.5 rounded-lg shrink-0 ${deliveryMode === 'clean' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                          <ShieldCheck className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-bold text-slate-900">100% Clean & Natural Mode</span>
+                            <span className="text-[9px] bg-emerald-500 text-white font-black px-1.5 py-0.5 rounded uppercase tracking-wider">Recommended</span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 leading-relaxed mt-1">
+                            <strong>100% साफ और प्राकृतिक टेक्स्ट।</strong> आधुनिक Gmail/Yahoo AI सिस्टम अदृश्य कैरेक्टर्स (Zero-Width Characters) को डिटेक्ट कर स्पैम में डाल देते हैं। यह मोड बिना किसी अदृश्य कोड के ईमेल भेजता है जो पूरी तरह सुरक्षित है।
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Option 2: Synonym Optimizer */}
+                      <div 
+                        onClick={() => setDeliveryMode('optimized_synonyms')}
+                        className={`p-3 rounded-xl border transition-all cursor-pointer flex gap-2.5 items-start ${
+                          deliveryMode === 'optimized_synonyms' 
+                            ? 'bg-indigo-50/70 border-indigo-300 ring-2 ring-indigo-500/10' 
+                            : 'bg-white border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className={`p-1.5 rounded-lg shrink-0 ${deliveryMode === 'optimized_synonyms' ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                          <Sparkles className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-bold text-slate-900">Trigger Word Synonym Optimizer</span>
+                            <span className="text-[9px] bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded uppercase font-medium">Smart AI Guard</span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 leading-relaxed mt-1">
+                            यह आपके ईमेल में मौजूद स्पैम ट्रिगर शब्दों (जैसे: <em>free, money, cash, buy now</em>) को आटोमेटिकली प्रोफेशनल सिनोनिम्स (जैसे: <em>complimentary, earnings, funds, get access</em>) से बदल देता है बिना कोई अदृश्य कैरेक्टर जोड़े।
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Option 3: Legacy Obfuscator */}
+                      <div 
+                        onClick={() => setDeliveryMode('obfuscate')}
+                        className={`p-3 rounded-xl border transition-all cursor-pointer flex gap-2.5 items-start ${
+                          deliveryMode === 'obfuscate' 
+                            ? 'bg-rose-50/50 border-rose-200 ring-2 ring-rose-500/10' 
+                            : 'bg-white border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className={`p-1.5 rounded-lg shrink-0 ${deliveryMode === 'obfuscate' ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                          <ShieldAlert className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-bold text-slate-900">Legacy Shield Obfuscation</span>
+                            <span className="text-[9px] bg-rose-100 text-rose-700 font-bold px-1.5 py-0.5 rounded uppercase font-medium">Spam Risk for Gmail</span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 leading-relaxed mt-1">
+                            यह शब्दों के बीच अदृश्य जीरो-विड्थ कैरेक्टर डालता है। साधारण ईमेल फ़िल्टर्स के लिए बढ़िया है, पर आधुनिक जीमेल के एआई डिटेक्टर्स इसे स्पैम बाइपास कोशिश मानकर तुरंत स्पैम फोल्डर में भेज सकते हैं।
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
+                </div>
 
                   {/* Interactive Spintax Guide for High Spam Protection */}
                   <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 text-xs space-y-2">
@@ -788,7 +864,6 @@ export default function App() {
                   </div>
                 </div>
               </div>
-            </div>
 
             {/* Spam Protection Status Block */}
             <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-3">
