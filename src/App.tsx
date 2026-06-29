@@ -86,6 +86,7 @@ export default function App() {
   // Bulk active sending state
   const [recipients, setRecipients] = useState<MailSendStatus[]>([]);
   const [isSending, setIsSending] = useState(false);
+  const [processingSenderEmail, setProcessingSenderEmail] = useState(''); // Tracking active sender for counter
   const [currentSendingIndex, setCurrentSendingIndex] = useState<number>(-1);
   const [delaySeconds, setDelaySeconds] = useState(6); // default to 6 seconds for safer delivery
   const [randomizeDelay, setRandomizeDelay] = useState(true); // default to true for human-like pattern
@@ -110,26 +111,9 @@ export default function App() {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          // Securely Wipe all data and clean history
-          setSenderName('');
-          setSenderEmail('');
-          setAppPassword('');
-          setSenderMode('single');
-          setBulkSendersInput('');
-          setSubject('{Quick question for|Regarding website potential of|Important update for} {{Name}}');
-          setBody(`<p>{Hi|Hello|Greetings} <strong>{{Name}}</strong>,</p>
-<p>{Hope you are doing well|Trust this email finds you well|Hope you're having a productive week}.</p>
-<p>{While reviewing online opportunities, I came across your business|I recently visited your website and found it has excellent potential}. Although it is currently not on the first-page listings, your website has a strong base for visitors. I'd like to email the custom quote we prepared for you.</p>
-<p>{Could you please let me know if this is the best email to send it to?|Would it be alright if I share the details with you?|Let me know if you would be interested in taking a look}.</p>
-<p>{Best regards|Warm regards|Sincerely},<br><strong>{{SenderName}}</strong></p>`);
-          setRecipientsInput('');
-          setRecipients([]);
-          setBulkLog(['🛡️ Session automatically wiped and reset after 30 minutes of inactive open time to protect credentials and delete history.']);
-          setConnectionStatus(null);
+          // Auto-logout after 30 minutes
           localStorage.clear();
           setIsAuthenticated(false);
-          setAuthId('');
-          setAuthPassword('');
           return 0;
         }
         return prev - 1;
@@ -421,6 +405,7 @@ export default function App() {
       
       if (pendingTargets.length === 0) {
         setIsSending(false);
+        setProcessingSenderEmail('');
         setCurrentSendingIndex(-1);
         addLog('🎉 All emails sent successfully! Bulk send operation complete.');
         alert('Bulk send operation has completed successfully!');
@@ -433,6 +418,7 @@ export default function App() {
       
       if (!currentSenderEmail || !currentAppPassword) {
         setIsSending(false);
+        setProcessingSenderEmail('');
         addLog('❌ Error: No valid Gmail Sender account configured.');
         alert('Please configure a valid Gmail Sender account.');
         return;
@@ -441,6 +427,7 @@ export default function App() {
       const count = getSentCountLast12Hours(currentSenderEmail);
       if (count >= 26) {
         setIsSending(false);
+        setProcessingSenderEmail('');
         addLog(`⚠️ Limit Reached: ${currentSenderEmail} has hit the Gmail limit of 26 emails / 12 hours!`);
         alert(`⚠️ Sending Limit Reached!\nYour Gmail account ${currentSenderEmail} has hit the 26-email limit in the last 12 hours.\n\nPlease wait for the cooldown to reset.`);
         return;
@@ -584,6 +571,8 @@ export default function App() {
     activeAddUniqueIdToSubjectRef.current = addUniqueIdToSubject;
     activeDeliveryModeRef.current = deliveryMode;
     activeConcurrencyRef.current = concurrency;
+    
+    setProcessingSenderEmail(senderEmail); // Set processing email
 
     // Set lists synchronously in state and references immediately to prevent race conditions
     setRecipients(list);
@@ -676,22 +665,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* Auto-Wipe Security Timer Banner */}
-      <div className="bg-amber-50/90 border-b border-amber-200/50 py-2.5 px-6 flex flex-col sm:flex-row items-center justify-between gap-3.5">
-        <div className="flex items-center gap-2 text-[11px] text-amber-900 font-medium">
-          <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
-          <span>
-            <strong>हाई-प्रोटेक्शन सुरक्षा:</strong> आपकी प्राइवेसी और सुरक्षा के लिए क्रेडेंशियल्स और हिस्ट्री <strong>{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</strong> मिनट में स्वतः वाइप हो जाएंगे। (माउस हिलाने या टाइप करने पर रीसेट होगा)
-          </span>
-        </div>
-        <button 
-          onClick={() => setTimeLeft(1800)}
-          className="text-[10px] bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-1 rounded-lg transition flex items-center gap-1 shadow-xs active:scale-95"
-        >
-          <RefreshCw className="w-3 h-3" />
-          Timer Reset करें
-        </button>
-      </div>
 
       {/* Primary Workspace container */}
       <main className="flex-1 max-w-6xl mx-auto w-full p-4 md:p-6 space-y-6">
@@ -738,7 +711,7 @@ export default function App() {
                   </span>
                   {senderEmail && (
                     <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-                      {getSentCountLast12Hours(senderEmail)} / 26 Sent
+                      {getSentCountLast12Hours(processingSenderEmail || senderEmail)} / 26 Sent
                     </span>
                   )}
                 </label>
