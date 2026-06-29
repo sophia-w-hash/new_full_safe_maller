@@ -221,19 +221,11 @@ async function startServer() {
     const spunSubject = parseSpintax(subject);
     const spunBody = parseSpintax(processedBody);
 
-    let finalSubject = spunSubject;
-    let finalBody = spunBody;
-
-    // Process based on chosen Delivery Optimization Mode
-    if (deliveryMode === "optimized_synonyms") {
-      finalSubject = sanitizeSpamKeywords(spunSubject);
-      finalBody = sanitizeSpamKeywords(spunBody);
-    } else if (deliveryMode === "obfuscate") {
-      const cleanSub = sanitizeSpamKeywords(spunSubject);
-      const cleanBdy = sanitizeSpamKeywords(spunBody);
-      finalSubject = injectInvisibleSpamShieldSubject(cleanSub);
-      finalBody = injectInvisibleSpamShield(cleanBdy);
-    }
+    // For maximum inbox delivery and high-safety compliance, we bypass all artificial obfuscation,
+    // zero-width characters, and header-spoofing that trigger modern Gmail/Yahoo spam detectors.
+    // We send the clean, natural text and proper HTML with legitimate multi-part MIME formats.
+    const finalSubject = spunSubject;
+    const finalBody = spunBody;
 
     // Generate plain text version
     const plainTextAlternative = cleanHtmlToText(spunBody);
