@@ -222,16 +222,13 @@ app.post("/api/mail/send-single", async (req, res) => {
 
   const transporter = nodemailer.createTransport({
     pool: true, // Reuse TCP/SMTP connections for 3-5x faster sending speeds
-    maxConnections: 10, // Increased for slightly faster throughput
-    maxMessages: 200, // Rotate SMTP connections safely
+    maxConnections: 5, // Maintain stable sessions without overloading Google
+    maxMessages: 100, // Rotate SMTP connections safely
     service: "gmail",
     auth: {
       user: senderEmail,
       pass: cleanedPassword,
     },
-    // Adding secure options to prevent handshake issues
-    secure: true, 
-    port: 465
   });
 
   // Format body to preserve line breaks
@@ -241,11 +238,20 @@ app.post("/api/mail/send-single", async (req, res) => {
   const spunSubject = parseSpintax(subject);
   const spunBody = parseSpintax(processedBody);
 
-  // For maximum inbox delivery and high-safety compliance, we bypass all artificial obfuscation,
-  // zero-width characters, and header-spoofing that trigger modern Gmail/Yahoo spam detectors.
-  // We send the clean, natural text and proper HTML with legitimate multi-part MIME formats.
-  const finalSubject = spunSubject;
-  const finalBody = spunBody;
+  let finalSubject = spunSubject;
+  let finalBody = spunBody;
+
+  // Process based on chosen Delivery Optimization Mode
+  if (deliveryMode === "optimized_synonyms") {
+    finalSubject = sanitizeSpamKeywords(spunSubject);
+    finalBody = sanitizeSpamKeywords(spunBody);
+  } else if (deliveryMode === "obfuscate") {
+    // Obfuscate using zero-width characters (Legacy mode - warn user about modern AI spam filters)
+    const cleanSub = sanitizeSpamKeywords(spunSubject);
+    const cleanBdy = sanitizeSpamKeywords(spunBody);
+    finalSubject = injectInvisibleSpamShieldSubject(cleanSub);
+    finalBody = injectInvisibleSpamShield(cleanBdy);
+  }
 
   // Generate plain text version
   const plainTextAlternative = cleanHtmlToText(spunBody);
@@ -265,13 +271,7 @@ app.post("/api/mail/send-single", async (req, res) => {
         text: plainTextAlternative, // Multi-part alternative MIME to heavily reduce spam score
         // We omit custom messageId and let Google SMTP auto-generate the perfect cryptographically signed Message-ID
         headers: {
-          'MIME-Version': '1.0',
-          'List-Unsubscribe': `<mailto:unsubscribe@${senderEmail.split('@')[1]}>`,
-          'Precedence': 'bulk',
-          'X-Mailer': 'BulkMailSenderPro/1.0',
-          'X-Priority': '3 (Normal)',
-          'Content-Language': 'en-US',
-          'Auto-Submitted': 'auto-generated'
+          'MIME-Version': '1.0'
         }
       });
 
