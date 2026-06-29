@@ -83,6 +83,66 @@ export default function App() {
   const [connectionStatus, setConnectionStatus] = useState<{ success?: boolean; message: string } | null>(null);
   const [bulkLog, setBulkLog] = useState<string[]>([]);
   
+  // 30-Minute Auto-Reset & History Clean Security Timer
+  const [timeLeft, setTimeLeft] = useState(1800); // 1800s = 30 minutes
+
+  useEffect(() => {
+    if (isSending) {
+      // Keep resetting timer during active bulk sending so it doesn't get interrupted!
+      setTimeLeft(1800);
+      return;
+    }
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          // Securely Wipe all data and clean history
+          setSenderName('');
+          setSenderEmail('');
+          setAppPassword('');
+          setSenderMode('single');
+          setBulkSendersInput('');
+          setSubject('{Quick question for|Regarding website potential of|Important update for} {{Name}}');
+          setBody(`<p>{Hi|Hello|Greetings} <strong>{{Name}}</strong>,</p>
+<p>{Hope you are doing well|Trust this email finds you well|Hope you're having a productive week}.</p>
+<p>{While reviewing online opportunities, I came across your business|I recently visited your website and found it has excellent potential}. Although it is currently not on the first-page listings, your website has a strong base for visitors. I'd like to email the custom quote we prepared for you.</p>
+<p>{Could you please let me know if this is the best email to send it to?|Would it be alright if I share the details with you?|Let me know if you would be interested in taking a look}.</p>
+<p>{Best regards|Warm regards|Sincerely},<br><strong>{{SenderName}}</strong></p>`);
+          setRecipientsInput('');
+          setRecipients([]);
+          setBulkLog(['🛡️ Session automatically wiped and reset after 30 minutes of inactive open time to protect credentials and delete history.']);
+          setConnectionStatus(null);
+          localStorage.clear();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isSending]);
+
+  useEffect(() => {
+    if (isSending) {
+      setTimeLeft(1800);
+      return;
+    }
+    
+    const handleActivity = () => {
+      setTimeLeft(1800);
+    };
+
+    window.addEventListener('mousemove', handleActivity);
+    window.addEventListener('keydown', handleActivity);
+    window.addEventListener('click', handleActivity);
+
+    return () => {
+      window.removeEventListener('mousemove', handleActivity);
+      window.removeEventListener('keydown', handleActivity);
+      window.removeEventListener('click', handleActivity);
+    };
+  }, [isSending]);
+  
   const stopRequestedRef = useRef(false);
 
   // Synchronous references to avoid triggering the useEffect sending loop on state/prop change
@@ -266,70 +326,6 @@ export default function App() {
       addLog('❌ SMTP Server error: ' + error.message);
     } finally {
       setTestingConnection(false);
-    }
-  };
-
-  // Clean & Fix Template (Spam Buster client-side tool)
-  const runSpamBuster = () => {
-    const spamMap: { [key: string]: string } = {
-      "free": "complimentary",
-      "guaranteed": "assured",
-      "100% satisfied": "fully satisfied",
-      "earn money": "generate income",
-      "make money": "grow income",
-      "risk-free": "secure",
-      "winner": "finalist",
-      "cash": "funds",
-      "millions": "substantial resources",
-      "crypto": "digital assets",
-      "bitcoin": "blockchain asset",
-      "buy now": "get access",
-      "click here": "explore details",
-      "income": "earnings",
-      "marketing": "outreach",
-      "sales": "promotional",
-      "cheap": "affordable",
-      "seo": "online visibility",
-      "google first page": "search ranking",
-      "rank": "position",
-      "offer": "opportunity",
-      "price": "cost",
-      "buy": "acquire",
-      "click": "visit",
-      "link": "page"
-    };
-
-    let subjectCleaned = subject;
-    let bodyCleaned = body;
-    let count = 0;
-
-    for (const [word, replacement] of Object.entries(spamMap)) {
-      const regex = new RegExp(`\\b${word}\\b`, 'gi');
-      
-      const subMatches = subjectCleaned.match(regex);
-      if (subMatches) count += subMatches.length;
-      subjectCleaned = subjectCleaned.replace(regex, replacement);
-
-      const bodyMatches = bodyCleaned.match(regex);
-      if (bodyMatches) count += bodyMatches.length;
-      bodyCleaned = bodyCleaned.replace(regex, replacement);
-    }
-
-    if (count > 0) {
-      setSubject(subjectCleaned);
-      setBody(bodyCleaned);
-      addLog(`✨ Spam Buster: Replaced ${count} high-risk words with highly-deliverable synonyms.`);
-      alert(`🎉 Done! Replaced ${count} potential spam words with safe professional synonyms.`);
-    } else {
-      alert("✅ Perfect! No high-risk spam keywords detected in your subject or body.");
-    }
-  };
-
-  const resetToCleanTemplate = () => {
-    if (window.confirm("क्या आप मैसेज और विषय को 100% इनबॉक्स-सुरक्षित टेम्पलेट पर रीसेट करना चाहते हैं? इसमें कोई बाहरी बॉर्डर या फालतू लाइन्स नहीं होंगी।")) {
-      setSubject("{Quick question for|Regarding website potential of|Important update for} {{Name}}");
-      setBody(`<p>{Hi|Hello|Greetings} <strong>{{Name}}</strong>,</p>\n<p>{Hope you are doing well|Trust this email finds you well|Hope you're having a productive week}.</p>\n<p>{While reviewing online opportunities, I came across your business|I recently visited your website and found it has excellent potential}. Although it is currently not on the first-page listings, your website has a strong base for visitors. I'd like to email the custom quote we prepared for you.</p>\n<p>{Could you please let me know if this is the best email to send it to?|Would it be alright if I share the details with you?|Let me know if you would be interested in taking a look}.</p>\n<p>{Best regards|Warm regards|Sincerely},<br><strong>{{SenderName}}</strong></p>`);
-      addLog("🔄 Reset to ultra-clean HTML template (no borders, no extra lines).");
     }
   };
 
@@ -617,6 +613,23 @@ export default function App() {
         </div>
       </header>
 
+      {/* Auto-Wipe Security Timer Banner */}
+      <div className="bg-amber-50/90 border-b border-amber-200/50 py-2.5 px-6 flex flex-col sm:flex-row items-center justify-between gap-3.5">
+        <div className="flex items-center gap-2 text-[11px] text-amber-900 font-medium">
+          <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+          <span>
+            <strong>हाई-प्रोटेक्शन सुरक्षा:</strong> आपकी प्राइवेसी और सुरक्षा के लिए क्रेडेंशियल्स और हिस्ट्री <strong>{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</strong> मिनट में स्वतः वाइप हो जाएंगे। (माउस हिलाने या टाइप करने पर रीसेट होगा)
+          </span>
+        </div>
+        <button 
+          onClick={() => setTimeLeft(1800)}
+          className="text-[10px] bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-1 rounded-lg transition flex items-center gap-1 shadow-xs active:scale-95"
+        >
+          <RefreshCw className="w-3 h-3" />
+          Timer Reset करें
+        </button>
+      </div>
+
       {/* Primary Workspace container */}
       <main className="flex-1 max-w-6xl mx-auto w-full p-4 md:p-6 space-y-6">
         
@@ -740,26 +753,6 @@ export default function App() {
                       className="text-[10px] bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded text-slate-600 font-mono transition"
                     >
                       {"{{SenderName}}"}
-                    </button>
-                  </div>
-                  <div className="flex gap-1.5">
-                    <button
-                      type="button"
-                      onClick={runSpamBuster}
-                      className="text-[10.5px] bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold border border-amber-200 px-2.5 py-1 rounded-lg transition flex items-center gap-1 shadow-xs"
-                      title="विषय और बॉडी में से स्पैम शब्दों को हटाकर सुरक्षित पर्यायवाची शब्द लिखें"
-                    >
-                      <Zap className="w-3 h-3 text-amber-500 fill-amber-500" />
-                      Spam Buster (स्पैम हटाओ)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={resetToCleanTemplate}
-                      className="text-[10.5px] bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold border border-emerald-200 px-2.5 py-1 rounded-lg transition flex items-center gap-1 shadow-xs"
-                      title="100% इनबॉक्स-सुरक्षित टेम्पलेट पर रीसेट करें"
-                    >
-                      <Check className="w-3 h-3 text-emerald-500" />
-                      Clean Template (साफ़ टेम्पलेट)
                     </button>
                   </div>
                 </div>
