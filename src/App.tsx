@@ -26,11 +26,25 @@ import {
   ShieldCheck,
   Check,
   RefreshCw,
-  Zap
+  Zap,
+  LogIn
 } from 'lucide-react';
 import { MailSendStatus } from './types';
 
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authId, setAuthId] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (authId === '####' && authPassword === '####') {
+      setIsAuthenticated(true);
+    } else {
+      alert('Invalid ID or Password');
+    }
+  };
+
   // Inputs matching user's layout structure
   const [deliveryMode, setDeliveryMode] = useState<'clean' | 'optimized_synonyms' | 'obfuscate'>(
     (localStorage.getItem('deliveryMode') as any) || 'clean'
@@ -87,8 +101,8 @@ export default function App() {
   const [timeLeft, setTimeLeft] = useState(1800); // 1800s = 30 minutes
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     if (isSending) {
-      // Keep resetting timer during active bulk sending so it doesn't get interrupted!
       setTimeLeft(1800);
       return;
     }
@@ -113,6 +127,9 @@ export default function App() {
           setBulkLog(['🛡️ Session automatically wiped and reset after 30 minutes of inactive open time to protect credentials and delete history.']);
           setConnectionStatus(null);
           localStorage.clear();
+          setIsAuthenticated(false);
+          setAuthId('');
+          setAuthPassword('');
           return 0;
         }
         return prev - 1;
@@ -120,7 +137,7 @@ export default function App() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isSending]);
+  }, [isSending, isAuthenticated]);
 
   useEffect(() => {
     if (isSending) {
@@ -132,12 +149,10 @@ export default function App() {
       setTimeLeft(1800);
     };
 
-    window.addEventListener('mousemove', handleActivity);
     window.addEventListener('keydown', handleActivity);
     window.addEventListener('click', handleActivity);
 
     return () => {
-      window.removeEventListener('mousemove', handleActivity);
       window.removeEventListener('keydown', handleActivity);
       window.removeEventListener('click', handleActivity);
     };
@@ -348,8 +363,10 @@ export default function App() {
       setBulkLog([]);
       setConnectionStatus(null);
       localStorage.clear();
+      setIsAuthenticated(false);
+      setAuthId('');
+      setAuthPassword('');
       addLog('All data cleared successfully.');
-      alert('All Logout Completed! Fields cleared.');
     }
   };
 
@@ -422,15 +439,15 @@ export default function App() {
       }
 
       const count = getSentCountLast12Hours(currentSenderEmail);
-      if (count >= 500) {
+      if (count >= 26) {
         setIsSending(false);
-        addLog(`⚠️ Limit Reached: ${currentSenderEmail} has hit the Gmail limit of 500 emails / 12 hours!`);
-        alert(`⚠️ Sending Limit Reached!\nYour Gmail account ${currentSenderEmail} has hit the 500-email limit in the last 12 hours.\n\nPlease wait for the cooldown to reset.`);
+        addLog(`⚠️ Limit Reached: ${currentSenderEmail} has hit the Gmail limit of 26 emails / 12 hours!`);
+        alert(`⚠️ Sending Limit Reached!\nYour Gmail account ${currentSenderEmail} has hit the 26-email limit in the last 12 hours.\n\nPlease wait for the cooldown to reset.`);
         return;
       }
 
-      // Pre-calculate how many emails we can send in this batch without exceeding 500
-      const remainingLimit = 500 - count;
+      // Pre-calculate how many emails we can send in this batch without exceeding 26
+      const remainingLimit = 26 - count;
       const targetsWithSenders = pendingTargets.slice(0, remainingLimit).map(item => ({
         index: item.index,
         target: item.target,
@@ -587,6 +604,52 @@ export default function App() {
   const successCount = recipients.filter(r => r.status === 'success').length;
   const failedCount = recipients.filter(r => r.status === 'failed').length;
 
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="bg-white max-w-sm w-full rounded-2xl shadow-xl p-8">
+          <div className="flex justify-center mb-6">
+            <div className="bg-indigo-600 text-white p-3 rounded-2xl shadow-lg">
+              <Lock className="w-8 h-8" />
+            </div>
+          </div>
+          <h2 className="text-2xl font-black text-center text-slate-900 mb-2">Secure Login</h2>
+          <p className="text-center text-slate-500 text-sm mb-8">Access Bulk Mail Sender Pro</p>
+          
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Login ID</label>
+              <input
+                type="text"
+                value={authId}
+                onChange={(e) => setAuthId(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Password</label>
+              <input
+                type="password"
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 mt-6"
+            >
+              <LogIn className="w-5 h-5" />
+              Secure Login
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div id="bulk-mail-app-root" className="min-h-screen bg-slate-50 flex flex-col text-slate-800 font-sans">
       
@@ -675,7 +738,7 @@ export default function App() {
                   </span>
                   {senderEmail && (
                     <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-                      {getSentCountLast12Hours(senderEmail)} / 500 Sent
+                      {getSentCountLast12Hours(senderEmail)} / 26 Sent
                     </span>
                   )}
                 </label>
@@ -689,7 +752,7 @@ export default function App() {
                 {senderEmail && (
                   <p className="text-[10.5px] text-slate-500 mt-1.5 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                    इस Gmail ID के लिए 12 घंटे में 500 ईमेल की सीमा (limit) तय है।
+                    इस Gmail ID के लिए 12 घंटे में 26 ईमेल की सीमा (limit) तय है।
                   </p>
                 )}
               </div>
@@ -803,11 +866,11 @@ export default function App() {
 
                 <button
                   type="button"
-                  onClick={handleAllLogout}
+                  onDoubleClick={handleAllLogout}
                   className="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold py-3.5 px-6 rounded-xl text-xs transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer border border-rose-200"
                 >
                   <LogOut className="w-4 h-4" />
-                  All Logout (सब साफ़ करें)
+                  Double Click Logout (सब साफ़ करें)
                 </button>
               </div>
 
@@ -1063,45 +1126,6 @@ export default function App() {
 
           {/* Right Column (Live stats, list tracker) */}
           <div className="lg:col-span-6 space-y-6">
-            
-            {/* Real-time stats dashboard */}
-            <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-4">
-              <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                <Sliders className="w-4 h-4 text-indigo-500" />
-                Live Dispatch Analytics
-              </h3>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-slate-50 rounded-lg p-3 text-center border border-slate-100">
-                  <span className="text-[10px] text-slate-400 font-semibold uppercase block">Total Load</span>
-                  <span className="text-xl font-black text-slate-800 font-mono">{recipients.length}</span>
-                </div>
-                <div className="bg-emerald-50 rounded-lg p-3 text-center border border-emerald-100">
-                  <span className="text-[10px] text-emerald-500 font-semibold uppercase block">Sent Success</span>
-                  <span className="text-xl font-black text-emerald-700 font-mono">{successCount}</span>
-                </div>
-                <div className="bg-rose-50 rounded-lg p-3 text-center border border-rose-100">
-                  <span className="text-[10px] text-rose-400 font-semibold uppercase block">Failed</span>
-                  <span className="text-xl font-black text-rose-700 font-mono">{failedCount}</span>
-                </div>
-              </div>
-
-              {/* Progress bar */}
-              {recipients.length > 0 && (
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs text-slate-500 font-medium">
-                    <span>Overall Dispatch Completion</span>
-                    <span className="font-mono">{Math.round(((successCount + failedCount) / recipients.length) * 100)}%</span>
-                  </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                    <div 
-                      className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${((successCount + failedCount) / recipients.length) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
 
             {/* Recipient breakdown list */}
             {recipients.length > 0 && (
