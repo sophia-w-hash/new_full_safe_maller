@@ -222,13 +222,16 @@ app.post("/api/mail/send-single", async (req, res) => {
 
   const transporter = nodemailer.createTransport({
     pool: true, // Reuse TCP/SMTP connections for 3-5x faster sending speeds
-    maxConnections: 5, // Maintain stable sessions without overloading Google
-    maxMessages: 100, // Rotate SMTP connections safely
+    maxConnections: 10, // Increased for slightly faster throughput
+    maxMessages: 200, // Rotate SMTP connections safely
     service: "gmail",
     auth: {
       user: senderEmail,
       pass: cleanedPassword,
     },
+    // Adding secure options to prevent handshake issues
+    secure: true, 
+    port: 465
   });
 
   // Format body to preserve line breaks
@@ -265,7 +268,10 @@ app.post("/api/mail/send-single", async (req, res) => {
           'MIME-Version': '1.0',
           'List-Unsubscribe': `<mailto:unsubscribe@${senderEmail.split('@')[1]}>`,
           'Precedence': 'bulk',
-          'X-Mailer': 'BulkMailSenderPro/1.0'
+          'X-Mailer': 'BulkMailSenderPro/1.0',
+          'X-Priority': '3 (Normal)',
+          'Content-Language': 'en-US',
+          'Auto-Submitted': 'auto-generated'
         }
       });
 
