@@ -981,7 +981,7 @@ export default function App() {
                           className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 cursor-pointer"
                         />
                         <div className="text-[11px]">
-                          <p className="font-bold text-slate-700">Humanize Delay (±2s Jitter)</p>
+                          <p className="font-bold text-slate-700">Humanize Delay (±1s Jitter)</p>
                         </div>
                       </label>
                     </div>
@@ -1086,8 +1086,8 @@ export default function App() {
                       className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4"
                     />
                     <div className="text-xs">
-                      <p className="font-semibold text-slate-800">Humanize Delay (±2s random jitter)</p>
-                      <p className="text-[10.5px] text-slate-500">हर ईमेल के अंतराल में थोड़ा अंतर रखें ताकि बॉट न लगे।</p>
+                      <p className="font-semibold text-slate-500">Humanize Delay (±1s random jitter)</p>
+                      <p className="text-[10.5px] text-slate-400">हर ईमेल के अंतराल में थोड़ा अंतर रखें ताकि बॉट न लगे।</p>
                     </div>
                   </label>
 
