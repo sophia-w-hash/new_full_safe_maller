@@ -88,7 +88,7 @@ export default function App() {
   const [isSending, setIsSending] = useState(false);
   const [processingSenderEmail, setProcessingSenderEmail] = useState(''); // Tracking active sender for counter
   const [currentSendingIndex, setCurrentSendingIndex] = useState<number>(-1);
-  const [delaySeconds, setDelaySeconds] = useState(6); // default to 6 seconds for safer delivery
+  const [delaySeconds, setDelaySeconds] = useState(3); // default to 3 seconds for safer delivery
   const [randomizeDelay, setRandomizeDelay] = useState(true); // default to true for human-like pattern
   const [addUniqueIdToSubject, setAddUniqueIdToSubject] = useState(false); // FALSE by default so no extra words are added unless manually checked
   
@@ -536,7 +536,7 @@ export default function App() {
           : delaySecondsRef.current;
 
         addLog(`Sleeping for ${actualDelay}s before dispatching next batch...`);
-        timerId = setTimeout(sendNext, actualDelay * 1000);
+        timerId = setTimeout(sendNext, actualDelay * 600);
       }
     };
 
