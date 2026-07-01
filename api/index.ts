@@ -258,9 +258,9 @@ app.post("/api/mail/send-single", async (req, res) => {
   const spunSubject = parseSpintax(subject);
   const spunBody = parseSpintax(processedBody);
 
-  // Apply spam keyword sanitization
-  const finalSubject = sanitizeSpamKeywords(spunSubject);
-  const finalBody = sanitizeSpamKeywords(spunBody);
+  // Use raw spun content directly for maximum inbox delivery
+  const finalSubject = spunSubject;
+  const finalBody = spunBody;
 
   // Generate plain text version
   const plainTextAlternative = cleanHtmlToText(finalBody);
