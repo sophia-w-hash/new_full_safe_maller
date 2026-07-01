@@ -290,16 +290,13 @@ ${finalBody}
 
   while (attempts < maxAttempts) {
     try {
-      const messageId = `<${crypto.randomUUID().replace(/-/g, '')}@mail.gmail.com>`;
-      
       const info = await transporter.sendMail({
-        from: senderName ? { name: senderName, address: senderEmail } : senderEmail,
+        from: senderName ? `"${senderName.replace(/"/g, '')}" <${senderEmail}>` : senderEmail,
         to: recipientEmail,
         replyTo: senderEmail,
         subject: finalSubject,
         html: finalBody,
         text: plainTextAlternative,
-        messageId: messageId,
       });
 
       return res.json({ success: true, messageId: info.messageId });
