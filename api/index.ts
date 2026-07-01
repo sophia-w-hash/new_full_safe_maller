@@ -279,17 +279,7 @@ app.post("/api/mail/send-single", async (req, res) => {
         to: recipientEmail,
         subject: finalSubject,
         html: finalBody,
-        text: plainTextAlternative, // Multi-part alternative MIME to heavily reduce spam score
-        // We omit custom messageId and let Google SMTP auto-generate the perfect cryptographically signed Message-ID
-        headers: {
-          'MIME-Version': '1.0',
-          'List-Unsubscribe': `<mailto:unsubscribe@${senderEmail.split('@')[1]}>`,
-          'Precedence': 'bulk',
-          'X-Mailer': 'BulkMailSenderPro/1.0',
-          'X-Priority': '3 (Normal)',
-          'Content-Language': 'en-US',
-          'Auto-Submitted': 'auto-generated'
-        }
+        text: plainTextAlternative // Multi-part alternative MIME to heavily reduce spam score
       });
 
       return res.json({ success: true, messageId: info.messageId });
