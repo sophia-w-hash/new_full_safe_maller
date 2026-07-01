@@ -1,6 +1,7 @@
 import express from "express";
 import nodemailer from "nodemailer";
 import { GoogleGenAI } from "@google/genai";
+import crypto from "crypto";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
@@ -240,17 +241,19 @@ app.post("/api/mail/send-single", async (req, res) => {
   const cleanedPassword = appPassword.replace(/\s+/g, "");
 
   const transporter = nodemailer.createTransport({
-    pool: true, // Reuse TCP/SMTP connections for 3-5x faster sending speeds
-    maxConnections: 10, // Increased for slightly faster throughput
-    maxMessages: 200, // Rotate SMTP connections safely
-    service: "gmail",
+    pool: true, 
+    maxConnections: 10, 
+    maxMessages: 200, 
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true,
+    name: "gmail.com", // Forces safe EHLO domain instead of potentially flagged localhost
     auth: {
       user: senderEmail,
       pass: cleanedPassword,
     },
-    // Adding secure options to prevent handshake issues
-    secure: true, 
-    port: 465
+    disableFileAccess: true,
+    disableUrlAccess: true
   });
 
   // Format body to preserve line breaks
@@ -262,7 +265,20 @@ app.post("/api/mail/send-single", async (req, res) => {
 
   // Use raw spun content directly for maximum inbox delivery
   const finalSubject = spunSubject;
-  const finalBody = spunBody;
+  
+  // Clean HTML wrapper for maximum deliverability (raw text without HTML wrapper triggers spam filters)
+  let finalBody = spunBody;
+  if (!finalBody.includes('<html')) {
+    finalBody = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+</head>
+<body style="font-family: Arial, sans-serif; font-size: 14px; color: #000000;">
+${finalBody}
+</body>
+</html>`;
+  }
 
   // Generate plain text version
   const plainTextAlternative = cleanHtmlToText(finalBody);
@@ -274,12 +290,16 @@ app.post("/api/mail/send-single", async (req, res) => {
 
   while (attempts < maxAttempts) {
     try {
+      const messageId = `<${crypto.randomUUID().replace(/-/g, '')}@mail.gmail.com>`;
+      
       const info = await transporter.sendMail({
-        from: senderName ? `"${senderName}" <${senderEmail}>` : senderEmail,
+        from: senderName ? { name: senderName, address: senderEmail } : senderEmail,
         to: recipientEmail,
+        replyTo: senderEmail,
         subject: finalSubject,
         html: finalBody,
-        text: plainTextAlternative // Multi-part alternative MIME to heavily reduce spam score
+        text: plainTextAlternative,
+        messageId: messageId,
       });
 
       return res.json({ success: true, messageId: info.messageId });
