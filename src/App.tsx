@@ -425,16 +425,16 @@ export default function App() {
       }
 
       const count = getSentCountLast12Hours(currentSenderEmail);
-      if (count >= 450) {
+      if (count >= 25) {
         setIsSending(false);
         setProcessingSenderEmail('');
-        addLog(`⚠️ Limit Reached: ${currentSenderEmail} has hit the Gmail limit of 450 emails / 12 hours!`);
-        alert(`⚠️ Sending Limit Reached!\nYour Gmail account ${currentSenderEmail} has hit the 450-email limit in the last 12 hours.\n\nPlease wait for the cooldown to reset.`);
+        addLog(`⚠️ Limit Reached: ${currentSenderEmail} has hit the safe limit of 25 emails / 12 hours!`);
+        alert(`⚠️ Sending Limit Reached!\nYour Gmail account ${currentSenderEmail} has hit the safe 25-email limit in the last 12 hours.\n\nPlease wait for the cooldown to reset.`);
         return;
       }
 
-      // Pre-calculate how many emails we can send in this batch without exceeding 450
-      const remainingLimit = 450 - count;
+      // Pre-calculate how many emails we can send in this batch without exceeding 25
+      const remainingLimit = 25 - count;
       const targetsWithSenders = pendingTargets.slice(0, remainingLimit).map(item => ({
         index: item.index,
         target: item.target,
@@ -443,8 +443,8 @@ export default function App() {
 
       if (targetsWithSenders.length === 0) {
         setIsSending(false);
-        addLog(`⚠️ Limit Reached: ${currentSenderEmail} has hit the Gmail limit of 450 emails / 12 hours!`);
-        alert(`⚠️ Sending Limit Reached!\nYour Gmail account ${currentSenderEmail} has hit the 450-email limit in the last 12 hours.`);
+        addLog(`⚠️ Limit Reached: ${currentSenderEmail} has hit the safe limit of 25 emails / 12 hours!`);
+        alert(`⚠️ Sending Limit Reached!\nYour Gmail account ${currentSenderEmail} has hit the safe 25-email limit in the last 12 hours.`);
         return;
       }
 
@@ -711,7 +711,7 @@ export default function App() {
                   </span>
                   {senderEmail && (
                     <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-                      {getSentCountLast12Hours(processingSenderEmail || senderEmail)} / 450 Sent
+                      {getSentCountLast12Hours(processingSenderEmail || senderEmail)} / 25 Sent
                     </span>
                   )}
                 </label>
@@ -725,7 +725,7 @@ export default function App() {
                 {senderEmail && (
                   <p className="text-[10.5px] text-slate-500 mt-1.5 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                    इस Gmail ID के लिए 12 घंटे में 450 ईमेल की सीमा (limit) तय है।
+                    इस Gmail ID के लिए 12 घंटे में 25 ईमेल की सीमा (limit) तय है।
                   </p>
                 )}
               </div>
