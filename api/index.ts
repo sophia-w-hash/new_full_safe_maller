@@ -48,6 +48,23 @@ app.post("/api/mail/test-connection", async (req, res) => {
 // Helper to sanitize high-risk spam keywords automatically using safe, elegant synonyms (zero-width characters removed to prevent AI filter triggers)
 function sanitizeSpamKeywords(text: string): string {
   const spamMap: { [key: string]: string } = {
+    "report": "summary",
+    "quote": "proposal",
+    "information": "particulars",
+    "ranking": "visibility",
+    "error": "glitch",
+    "issue": "difficulty",
+    "site": "domain",
+    "showing": "displaying",
+    "details": "specifics",
+    "screenshot": "visual",
+    "search": "discovery",
+    "Frist": "Initial",
+    "page": "section",
+    "1st": "primary",
+    "top": "leading",
+    "result": "outcome",
+    "engine": "system",
     "free": "complimentary",
     "guaranteed": "assured",
     "100% satisfied": "fully satisfied",
@@ -222,13 +239,16 @@ app.post("/api/mail/send-single", async (req, res) => {
 
   const transporter = nodemailer.createTransport({
     pool: true, // Reuse TCP/SMTP connections for 3-5x faster sending speeds
-    maxConnections: 5, // Maintain stable sessions without overloading Google
-    maxMessages: 100, // Rotate SMTP connections safely
+    maxConnections: 10, // Increased for slightly faster throughput
+    maxMessages: 200, // Rotate SMTP connections safely
     service: "gmail",
     auth: {
       user: senderEmail,
       pass: cleanedPassword,
     },
+    // Adding secure options to prevent handshake issues
+    secure: true, 
+    port: 465
   });
 
   // Format body to preserve line breaks
@@ -238,23 +258,12 @@ app.post("/api/mail/send-single", async (req, res) => {
   const spunSubject = parseSpintax(subject);
   const spunBody = parseSpintax(processedBody);
 
-  let finalSubject = spunSubject;
-  let finalBody = spunBody;
-
-  // Process based on chosen Delivery Optimization Mode
-  if (deliveryMode === "optimized_synonyms") {
-    finalSubject = sanitizeSpamKeywords(spunSubject);
-    finalBody = sanitizeSpamKeywords(spunBody);
-  } else if (deliveryMode === "obfuscate") {
-    // Obfuscate using zero-width characters (Legacy mode - warn user about modern AI spam filters)
-    const cleanSub = sanitizeSpamKeywords(spunSubject);
-    const cleanBdy = sanitizeSpamKeywords(spunBody);
-    finalSubject = injectInvisibleSpamShieldSubject(cleanSub);
-    finalBody = injectInvisibleSpamShield(cleanBdy);
-  }
+  // Apply spam keyword sanitization
+  const finalSubject = sanitizeSpamKeywords(spunSubject);
+  const finalBody = sanitizeSpamKeywords(spunBody);
 
   // Generate plain text version
-  const plainTextAlternative = cleanHtmlToText(spunBody);
+  const plainTextAlternative = cleanHtmlToText(finalBody);
 
   // Bulletproof SMTP send retry loop with Exponential Backoff
   let attempts = 0;
@@ -271,7 +280,13 @@ app.post("/api/mail/send-single", async (req, res) => {
         text: plainTextAlternative, // Multi-part alternative MIME to heavily reduce spam score
         // We omit custom messageId and let Google SMTP auto-generate the perfect cryptographically signed Message-ID
         headers: {
-          'MIME-Version': '1.0'
+          'MIME-Version': '1.0',
+          'List-Unsubscribe': `<mailto:unsubscribe@${senderEmail.split('@')[1]}>`,
+          'Precedence': 'bulk',
+          'X-Mailer': 'BulkMailSenderPro/1.0',
+          'X-Priority': '3 (Normal)',
+          'Content-Language': 'en-US',
+          'Auto-Submitted': 'auto-generated'
         }
       });
 
