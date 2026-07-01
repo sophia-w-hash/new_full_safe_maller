@@ -57,8 +57,8 @@ export default function App() {
   const [subject, setSubject] = useState(localStorage.getItem('subject') || '{Quick question for|Regarding website potential of|Important update for} {{Name}}');
   const [body, setBody] = useState(localStorage.getItem('body') || `<p>{Hi|Hello|Greetings} <strong>{{Name}}</strong>,</p>
 <p>{Hope you are doing well|Trust this email finds you well|Hope you're having a productive week}.</p>
-<p>{While reviewing online opportunities, I came across your business|I recently visited your website and found it has excellent potential}. Although it is currently not on the first-page listings, your website has a strong base for visitors. I'd like to email the custom quote we prepared for you.</p>
-<p>{Could you please let me know if this is the best email to send it to?|Would it be alright if I share the details with you?|Let me know if you would be interested in taking a look}.</p>
+<p>{While reviewing online opportunities, I came across your domain|I recently visited your domain and found it has excellent potential}. Although it is currently not in the primary view, your domain has a strong base for visitors. I'd like to email the custom proposal we prepared for you.</p>
+<p>{Could you please let me know if this is the best email to send it to?|Would it be alright if I share the specifics with you?|Let me know if you would be interested in taking a look}.</p>
 <p>{Best regards|Warm regards|Sincerely},<br><strong>{{SenderName}}</strong></p>`);
   const [recipientsInput, setRecipientsInput] = useState(localStorage.getItem('recipientsInput') || '');
   const [concurrency, setConcurrency] = useState(() => {
@@ -88,7 +88,7 @@ export default function App() {
   const [isSending, setIsSending] = useState(false);
   const [processingSenderEmail, setProcessingSenderEmail] = useState(''); // Tracking active sender for counter
   const [currentSendingIndex, setCurrentSendingIndex] = useState<number>(-1);
-  const [delaySeconds, setDelaySeconds] = useState(3); // default to 3 seconds for safer delivery
+  const [delaySeconds, setDelaySeconds] = useState(6); // default to 6 seconds for safer delivery
   const [randomizeDelay, setRandomizeDelay] = useState(true); // default to true for human-like pattern
   const [addUniqueIdToSubject, setAddUniqueIdToSubject] = useState(false); // FALSE by default so no extra words are added unless manually checked
   
@@ -339,8 +339,8 @@ export default function App() {
       setSubject('{Quick question for|Regarding website potential of|Important update for} {{Name}}');
       setBody(`<p>{Hi|Hello|Greetings} <strong>{{Name}}</strong>,</p>
 <p>{Hope you are doing well|Trust this email finds you well|Hope you're having a productive week}.</p>
-<p>{While reviewing online opportunities, I came across your business|I recently visited your website and found it has excellent potential}. Although it is currently not on the first-page listings, your website has a strong base for visitors. I'd like to email the custom quote we prepared for you.</p>
-<p>{Could you please let me know if this is the best email to send it to?|Would it be alright if I share the details with you?|Let me know if you would be interested in taking a look}.</p>
+<p>{While reviewing online opportunities, I came across your domain|I recently visited your domain and found it has excellent potential}. Although it is currently not in the primary view, your domain has a strong base for visitors. I'd like to email the custom proposal we prepared for you.</p>
+<p>{Could you please let me know if this is the best email to send it to?|Would it be alright if I share the specifics with you?|Let me know if you would be interested in taking a look}.</p>
 <p>{Best regards|Warm regards|Sincerely},<br><strong>{{SenderName}}</strong></p>`);
       setRecipientsInput('');
       setRecipients([]);
@@ -536,7 +536,7 @@ export default function App() {
           : delaySecondsRef.current;
 
         addLog(`Sleeping for ${actualDelay}s before dispatching next batch...`);
-        timerId = setTimeout(sendNext, actualDelay * 600);
+        timerId = setTimeout(sendNext, actualDelay * 1000);
       }
     };
 
@@ -981,7 +981,7 @@ export default function App() {
                           className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 cursor-pointer"
                         />
                         <div className="text-[11px]">
-                          <p className="font-bold text-slate-700">Humanize Delay (±1s Jitter)</p>
+                          <p className="font-bold text-slate-700">Humanize Delay (±2s Jitter)</p>
                         </div>
                       </label>
                     </div>
@@ -1086,8 +1086,8 @@ export default function App() {
                       className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4"
                     />
                     <div className="text-xs">
-                      <p className="font-semibold text-slate-500">Humanize Delay (±1s random jitter)</p>
-                      <p className="text-[10.5px] text-slate-400">हर ईमेल के अंतराल में थोड़ा अंतर रखें ताकि बॉट न लगे।</p>
+                      <p className="font-semibold text-slate-800">Humanize Delay (±2s random jitter)</p>
+                      <p className="text-[10.5px] text-slate-500">हर ईमेल के अंतराल में थोड़ा अंतर रखें ताकि बॉट न लगे।</p>
                     </div>
                   </label>
 
