@@ -88,7 +88,7 @@ export default function App() {
   const [isSending, setIsSending] = useState(false);
   const [processingSenderEmail, setProcessingSenderEmail] = useState(''); // Tracking active sender for counter
   const [currentSendingIndex, setCurrentSendingIndex] = useState<number>(-1);
-  const [delaySeconds, setDelaySeconds] = useState(6); // default to 6 seconds for safer delivery
+  const [delaySeconds, setDelaySeconds] = useState(3); // default to 3 seconds for faster delivery
   const [randomizeDelay, setRandomizeDelay] = useState(true); // default to true for human-like pattern
   const [addUniqueIdToSubject, setAddUniqueIdToSubject] = useState(false); // FALSE by default so no extra words are added unless manually checked
   
@@ -532,7 +532,7 @@ export default function App() {
       // Schedule next batch sending
       if (active && !stopRequestedRef.current) {
         const actualDelay = randomizeDelayRef.current 
-          ? Math.max(2, delaySecondsRef.current + Math.floor(Math.random() * 4) - 1)
+          ? Math.max(2, delaySecondsRef.current + Math.floor(Math.random() * 3) - 1)
           : delaySecondsRef.current;
 
         addLog(`Sleeping for ${actualDelay}s before dispatching next batch...`);
