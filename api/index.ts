@@ -45,6 +45,7 @@ app.post("/api/mail/test-connection", async (req, res) => {
   }
 });
 
+/*
 // Helper to sanitize high-risk spam keywords automatically using safe, elegant synonyms (zero-width characters removed to prevent AI filter triggers)
 function sanitizeSpamKeywords(text: string): string {
   const spamMap: { [key: string]: string } = {
@@ -99,6 +100,7 @@ function sanitizeSpamKeywords(text: string): string {
   }
   return sanitized;
 }
+*/
 
 // Helper to inject invisible Zero-Width Characters (legacy mode - not recommended for modern Gmail)
 function injectInvisibleSpamShield(htmlContent: string): string {
