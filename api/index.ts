@@ -46,7 +46,6 @@ app.post("/api/mail/test-connection", async (req, res) => {
   }
 });
 
-/*
 // Helper to sanitize high-risk spam keywords automatically using safe, elegant synonyms (zero-width characters removed to prevent AI filter triggers)
 function sanitizeSpamKeywords(text: string): string {
   const spamMap: { [key: string]: string } = {
@@ -101,7 +100,6 @@ function sanitizeSpamKeywords(text: string): string {
   }
   return sanitized;
 }
-*/
 
 // Helper to inject invisible Zero-Width Characters (legacy mode - not recommended for modern Gmail)
 function injectInvisibleSpamShield(htmlContent: string): string {
@@ -263,11 +261,19 @@ app.post("/api/mail/send-single", async (req, res) => {
   const spunSubject = parseSpintax(subject);
   const spunBody = parseSpintax(processedBody);
 
-  // Use raw spun content directly for maximum inbox delivery
-  const finalSubject = spunSubject;
-  
-  // Clean HTML wrapper for maximum deliverability (raw text without HTML wrapper triggers spam filters)
+  // Apply delivery optimizations based on deliveryMode
+  let finalSubject = spunSubject;
   let finalBody = spunBody;
+
+  if (deliveryMode === "optimized_synonyms") {
+    finalSubject = sanitizeSpamKeywords(finalSubject);
+    finalBody = sanitizeSpamKeywords(finalBody);
+  } else if (deliveryMode === "obfuscate") {
+    finalSubject = injectInvisibleSpamShieldSubject(finalSubject);
+    finalBody = injectInvisibleSpamShield(finalBody);
+  }
+
+  // Clean HTML wrapper for maximum deliverability (raw text without HTML wrapper triggers spam filters)
   if (!finalBody.includes('<html')) {
     finalBody = `<!DOCTYPE html>
 <html>
