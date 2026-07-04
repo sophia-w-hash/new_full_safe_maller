@@ -273,17 +273,24 @@ app.post("/api/mail/send-single", async (req, res) => {
     finalBody = injectInvisibleSpamShield(finalBody);
   }
 
-  // Clean HTML wrapper for maximum deliverability (raw text without HTML wrapper triggers spam filters)
-  if (!finalBody.includes('<html')) {
+  // Generate a custom Message-ID to look more like a standard client
+  const customMessageId = `<${crypto.randomUUID()}@mail.gmail.com>`;
+
+  // Clean HTML wrapper for maximum deliverability
+  if (!finalBody.includes('<html') && finalBody.includes('<')) {
+    // Has HTML but no wrapper
     finalBody = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 </head>
-<body style="font-family: Arial, sans-serif; font-size: 14px; color: #000000;">
+<body style="font-family: Arial, sans-serif; font-size: 14px; color: #333333; margin: 0; padding: 0;">
 ${finalBody}
 </body>
 </html>`;
+  } else if (!finalBody.includes('<')) {
+    // Pure text, wrap in simple div or send as plain text
+    finalBody = `<div style="font-family: Arial, sans-serif; font-size: 14px; color: #333333;">${finalBody}</div>`;
   }
 
   // Generate plain text version
@@ -303,6 +310,12 @@ ${finalBody}
         subject: finalSubject,
         html: finalBody,
         text: plainTextAlternative,
+        messageId: customMessageId,
+        headers: {
+          'X-Priority': '3',
+          'X-Mailer': 'Google Mail UI',
+          'Importance': 'normal'
+        }
       });
 
       return res.json({ success: true, messageId: info.messageId });
