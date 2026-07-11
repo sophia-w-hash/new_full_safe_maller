@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
+import crypto from "crypto";
 import nodemailer from "nodemailer";
 import { GoogleGenAI } from "@google/genai";
 
@@ -43,7 +44,7 @@ function sanitizeSpamKeywords(text: string): string {
   return sanitized;
 }
 
-// Helper to inject invisible Zero-Width Characters (legacy mode - not recommended for modern Gmail)
+// Helper to inject invisible Zero-Width Characters (legacy mode)
 function injectInvisibleSpamShield(htmlContent: string): string {
   const zeroWidths = ["\u200b", "\u200c", "\u200d"];
   let result = "";
@@ -80,8 +81,6 @@ function injectInvisibleSpamShield(htmlContent: string): string {
       inEntity = false;
     }
 
-    // Inject zero-width characters with 4% probability, ONLY outside of HTML tags, 
-    // outside of style/script blocks, outside of HTML entities (&nbsp;), and outside of variables like {{variable}}
     if (
       !inTag && 
       !inStyleOrScript && 
@@ -107,7 +106,6 @@ function injectInvisibleSpamShieldSubject(subjectText: string): string {
   for (let i = 0; i < subjectText.length; i++) {
     const char = subjectText[i];
     result += char;
-    // Inject with 4% probability, avoiding mustache templates to preserve variables
     if (char !== '{' && char !== '}' && Math.random() < 0.04) {
       const randomZwc = zeroWidths[Math.floor(Math.random() * zeroWidths.length)];
       result += randomZwc;
@@ -117,7 +115,6 @@ function injectInvisibleSpamShieldSubject(subjectText: string): string {
 }
 
 function parseSpintax(text: string): string {
-  // Recursively process Spintax {option1|option2|option3}
   const regex = /\{([^{}]+)\}/g;
   let hasSpintax = regex.test(text);
   
@@ -148,17 +145,6 @@ function cleanHtmlToText(html: string): string {
   return text.replace(/\s+/g, ' ').trim();
 }
 
-// Helper to preserve newline characters (\n) by converting them to <br /> outside HTML tags
-function preserveLineBreaksInHtml(html: string): string {
-  const parts = html.split(/(<[^>]+>)/g);
-  return parts.map((part) => {
-    if (part.startsWith('<') && part.endsWith('>')) {
-      return part;
-    }
-    return part.replace(/\r?\n/g, '<br />\n');
-  }).join('');
-}
-
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -173,7 +159,6 @@ async function startServer() {
       return res.status(400).json({ success: false, message: "Email and App Password are required" });
     }
 
-    // Clean space from password
     const cleanedPassword = appPassword.replace(/\s+/g, "");
 
     const transporter = nodemailer.createTransport({
@@ -196,9 +181,9 @@ async function startServer() {
     }
   });
 
-  // API to send a single email (for bulk execution)
+  // API to send a single email (for load-balanced bulk execution)
   app.post("/api/mail/send-single", async (req, res) => {
-    const { senderEmail, appPassword, senderName, recipientEmail, subject, body, deliveryMode = "clean" } = req.body;
+    const { senderEmail, appPassword, senderName, recipientEmail, subject, body } = req.body;
 
     if (!senderEmail || !appPassword || !recipientEmail || !subject || !body) {
       return res.status(400).json({ success: false, message: "Missing required fields" });
@@ -211,26 +196,30 @@ async function startServer() {
       auth: {
         user: senderEmail,
         pass: cleanedPassword,
-      },
+      }
     });
 
-    // Format body to preserve line breaks
-    const processedBody = preserveLineBreaksInHtml(body);
-
-    // Expand spintax (e.g. {Hello|Hi|Greetings})
     const spunSubject = parseSpintax(subject);
-    const spunBody = parseSpintax(processedBody);
+    let spunBody = parseSpintax(body);
 
-    // For maximum inbox delivery and high-safety compliance, we bypass all artificial obfuscation,
-    // zero-width characters, and header-spoofing that trigger modern Gmail/Yahoo spam detectors.
-    // We send the clean, natural text and proper HTML with legitimate multi-part MIME formats.
     const finalSubject = spunSubject;
-    const finalBody = spunBody;
+    let finalBody = spunBody;
+    
+    if (!finalBody.includes('<html') && !finalBody.includes('<div dir="ltr"')) {
+        const formattedBody = finalBody
+          .split('\n')
+          .map((line: string) => {
+              if (!line.trim()) return '<div><br></div>';
+              if (line.includes('<div') || line.includes('<p') || line.includes('<br')) return line;
+              return `<div>${line}</div>`;
+          })
+          .join('');
+          
+        finalBody = `<div dir="ltr">${formattedBody}</div>`;
+    }
 
-    // Generate plain text version
     const plainTextAlternative = cleanHtmlToText(spunBody);
 
-    // Bulletproof SMTP send retry loop with Exponential Backoff
     let attempts = 0;
     const maxAttempts = 3;
     let lastError: any = null;
@@ -242,13 +231,7 @@ async function startServer() {
           to: recipientEmail,
           subject: finalSubject,
           html: finalBody,
-          text: plainTextAlternative, // Multi-part alternative MIME to heavily reduce spam score
-          headers: {
-            'MIME-Version': '1.0',
-            'X-Priority': '3', // Normal Priority
-            'Priority': 'normal',
-            'Importance': 'Normal'
-          }
+          text: plainTextAlternative,
         });
 
         return res.json({ success: true, messageId: info.messageId });
@@ -256,7 +239,6 @@ async function startServer() {
         attempts++;
         lastError = error;
         if (attempts < maxAttempts) {
-          // Exponential backoff wait (e.g. 1s, 2s)
           await new Promise(resolve => setTimeout(resolve, attempts * 1000));
         }
       }
