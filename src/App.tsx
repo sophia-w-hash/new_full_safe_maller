@@ -412,39 +412,73 @@ export default function App() {
         return;
       }
 
-      // Check sender limit with 500 limit check using locked sender credentials
-      const currentSenderEmail = activeSenderEmailRef.current || senderEmailRef.current;
-      const currentAppPassword = activeAppPasswordRef.current || appPasswordRef.current;
-      
-      if (!currentSenderEmail || !currentAppPassword) {
+      // Find active senders with remaining capacity
+      interface SenderCapacity {
+        email: string;
+        appPassword: string;
+        remaining: number;
+      }
+      let activeSendersList: SenderCapacity[] = [];
+
+      if (senderModeRef.current === 'bulk') {
+        const parsed = parseBulkSenders(bulkSendersInputRef.current);
+        activeSendersList = parsed.map(s => ({
+          email: s.email,
+          appPassword: s.appPassword,
+          remaining: 25 - getSentCountLast12Hours(s.email)
+        })).filter(s => s.remaining > 0);
+      } else {
+        const email = activeSenderEmailRef.current || senderEmailRef.current;
+        const pass = activeAppPasswordRef.current || appPasswordRef.current;
+        if (email && pass) {
+          activeSendersList = [{
+            email,
+            appPassword: pass,
+            remaining: 25 - getSentCountLast12Hours(email)
+          }].filter(s => s.remaining > 0);
+        }
+      }
+
+      if (activeSendersList.length === 0) {
         setIsSending(false);
         setProcessingSenderEmail('');
-        addLog('❌ Error: No valid Gmail Sender account configured.');
-        alert('Please configure a valid Gmail Sender account.');
+        addLog('⚠️ Limit Reached: All configured Gmail sender accounts have hit their safe limit (25 emails / 12 hours) or no valid senders are loaded!');
+        alert('⚠️ Sending Limit Reached or No Senders Loaded!\n\nAll of your configured Gmail sender accounts have hit the safe 25-email limit in the last 12 hours or none are configured.\n\nPlease add more sender accounts or wait for the cooldown to reset.');
         return;
       }
 
-      const count = getSentCountLast12Hours(currentSenderEmail);
-      if (count >= 25) {
-        setIsSending(false);
-        setProcessingSenderEmail('');
-        addLog(`⚠️ Limit Reached: ${currentSenderEmail} has hit the safe limit of 25 emails / 12 hours!`);
-        alert(`⚠️ Sending Limit Reached!\nYour Gmail account ${currentSenderEmail} has hit the safe 25-email limit in the last 12 hours.\n\nPlease wait for the cooldown to reset.`);
-        return;
-      }
+      // Assign senders to our pending targets in this batch using load-balancing round-robin
+      const targetsWithSenders: {
+        index: number;
+        target: MailSendStatus;
+        sender: { email: string; appPassword: string };
+      }[] = [];
 
-      // Pre-calculate how many emails we can send in this batch without exceeding 25
-      const remainingLimit = 25 - count;
-      const targetsWithSenders = pendingTargets.slice(0, remainingLimit).map(item => ({
-        index: item.index,
-        target: item.target,
-        sender: { email: currentSenderEmail, appPassword: currentAppPassword }
-      }));
+      let senderIndex = 0;
+      for (let i = 0; i < pendingTargets.length; i++) {
+        let assigned = false;
+        for (let attempt = 0; attempt < activeSendersList.length; attempt++) {
+          const idx = (senderIndex + attempt) % activeSendersList.length;
+          const s = activeSendersList[idx];
+          if (s.remaining > 0) {
+            targetsWithSenders.push({
+              index: pendingTargets[i].index,
+              target: pendingTargets[i].target,
+              sender: { email: s.email, appPassword: s.appPassword }
+            });
+            s.remaining--;
+            senderIndex = (idx + 1) % activeSendersList.length;
+            assigned = true;
+            break;
+          }
+        }
+        if (!assigned) break; // Senders ran out of capacity
+      }
 
       if (targetsWithSenders.length === 0) {
         setIsSending(false);
-        addLog(`⚠️ Limit Reached: ${currentSenderEmail} has hit the safe limit of 25 emails / 12 hours!`);
-        alert(`⚠️ Sending Limit Reached!\nYour Gmail account ${currentSenderEmail} has hit the safe 25-email limit in the last 12 hours.`);
+        addLog('⚠️ Limit Reached: All active senders have exhausted their safe 12h limit.');
+        alert('⚠️ Sending Limit Reached!\nAll active sender accounts have exhausted their 25-email 12-hour limit.');
         return;
       }
 
@@ -463,19 +497,18 @@ export default function App() {
         targetsWithSenders.map(async ({ index, target, sender }) => {
           const uniqueMailId = Math.floor(100000 + Math.random() * 900000).toString();
           
-          // Personalization using locked credentials for this active session
+          // Personalization using locked credentials/active state
           const activeSubject = activeSubjectRef.current || subjectRef.current;
           const activeBody = activeBodyRef.current || bodyRef.current;
           const activeSenderName = activeSenderNameRef.current || senderNameRef.current;
-          const activeSenderEmail = activeSenderEmailRef.current || senderEmailRef.current;
           const activeAddUniqueIdToSubject = activeAddUniqueIdToSubjectRef.current || addUniqueIdToSubjectRef.current;
 
-          let parsedSubject = renderTemplate(activeSubject, target, uniqueMailId, activeSenderName, activeSenderEmail);
+          let parsedSubject = renderTemplate(activeSubject, target, uniqueMailId, activeSenderName, sender.email);
           if (activeAddUniqueIdToSubject) {
             parsedSubject = `${parsedSubject} [Ref: #${uniqueMailId}]`;
           }
           
-          const parsedBody = renderTemplate(activeBody, target, uniqueMailId, activeSenderName, activeSenderEmail);
+          const parsedBody = renderTemplate(activeBody, target, uniqueMailId, activeSenderName, sender.email);
 
           addLog(`[Batch Entry] Sender: ${sender.email} ➡️ Target: ${target.email}...`);
 
@@ -551,9 +584,17 @@ export default function App() {
 
   // Start sending triggered by send button
   const handleStartSending = () => {
-    if (!senderEmail || !appPassword) {
-      alert('Your Gmail and App Password are required to start sending.');
-      return;
+    if (senderMode === 'single') {
+      if (!senderEmail || !appPassword) {
+        alert('Your Gmail and App Password are required to start sending.');
+        return;
+      }
+    } else {
+      const parsed = parseBulkSenders(bulkSendersInput);
+      if (parsed.length === 0) {
+        alert('Please enter at least one valid Gmail and App Password in Multiple Senders input.');
+        return;
+      }
     }
 
     const list = parseRecipients(recipientsInput);
@@ -572,7 +613,14 @@ export default function App() {
     activeDeliveryModeRef.current = deliveryMode;
     activeConcurrencyRef.current = concurrency;
     
-    setProcessingSenderEmail(senderEmail); // Set processing email
+    if (senderMode === 'single') {
+      setProcessingSenderEmail(senderEmail); // Set processing email
+    } else {
+      const parsed = parseBulkSenders(bulkSendersInput);
+      if (parsed.length > 0) {
+        setProcessingSenderEmail(parsed[0].email);
+      }
+    }
 
     // Set lists synchronously in state and references immediately to prevent race conditions
     setRecipients(list);
@@ -684,6 +732,34 @@ export default function App() {
 
           <div className="p-6 space-y-6">
             
+            {/* Sender Selection Mode Tabs */}
+            <div className="bg-slate-50 p-1 rounded-xl border border-slate-200/60 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setSenderMode('single')}
+                className={`flex-1 py-2 px-4 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+                  senderMode === 'single'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-800 bg-transparent'
+                }`}
+              >
+                <User className="w-4 h-4" />
+                Single Sender (एक ईमेल से भेजें)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSenderMode('bulk')}
+                className={`flex-1 py-2 px-4 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+                  senderMode === 'bulk'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-800 bg-transparent'
+                }`}
+              >
+                <RefreshCw className="w-4 h-4 animate-spin-slow" />
+                Multiple Senders / Rotation Mode (कई ईमेल से बारी-बारी भेजें)
+              </button>
+            </div>
+
             {/* 2-Column Grid matching the requested user layout structure */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
@@ -702,49 +778,6 @@ export default function App() {
                 />
               </div>
 
-              {/* Your Gmail Address */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <Mail className="w-3.5 h-3.5 text-slate-400" />
-                    Your Gmail Address
-                  </span>
-                  {senderEmail && (
-                    <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-                      {getSentCountLast12Hours(processingSenderEmail || senderEmail)} / 25 Sent
-                    </span>
-                  )}
-                </label>
-                <input
-                  type="email"
-                  value={senderEmail}
-                  onChange={(e) => setSenderEmail(e.target.value)}
-                  placeholder="yourname@gmail.com"
-                  className="w-full bg-white text-slate-950 border border-slate-200 rounded-xl px-4 py-2.5 text-xs placeholder-slate-400 font-medium focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition shadow-xs"
-                />
-                {senderEmail && (
-                  <p className="text-[10.5px] text-slate-500 mt-1.5 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                    इस Gmail ID के लिए 12 घंटे में 25 ईमेल की सीमा (limit) तय है।
-                  </p>
-                )}
-              </div>
-
-              {/* 16-Digit App Password Block */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5 text-slate-400" />
-                  16-Digit App Password
-                </label>
-                <input
-                  type="password"
-                  value={appPassword}
-                  onChange={(e) => setAppPassword(e.target.value)}
-                  placeholder="xxxx xxxx xxxx xxxx"
-                  className="w-full bg-white text-slate-950 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono placeholder-slate-400 font-medium focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition shadow-xs"
-                />
-              </div>
-
               {/* Subject */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -759,6 +792,113 @@ export default function App() {
                   className="w-full bg-white text-slate-950 border border-slate-200 rounded-xl px-4 py-2.5 text-xs placeholder-slate-400 font-medium focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition shadow-xs"
                 />
               </div>
+
+              {/* Conditional Senders Inputs */}
+              {senderMode === 'single' ? (
+                <>
+                  {/* Your Gmail Address */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Mail className="w-3.5 h-3.5 text-slate-400" />
+                        Your Gmail Address
+                      </span>
+                      {senderEmail && (
+                        <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                          {getSentCountLast12Hours(processingSenderEmail || senderEmail)} / 25 Sent
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      type="email"
+                      value={senderEmail}
+                      onChange={(e) => setSenderEmail(e.target.value)}
+                      placeholder="yourname@gmail.com"
+                      className="w-full bg-white text-slate-950 border border-slate-200 rounded-xl px-4 py-2.5 text-xs placeholder-slate-400 font-medium focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition shadow-xs"
+                    />
+                    {senderEmail && (
+                      <p className="text-[10.5px] text-slate-500 mt-1.5 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                        इस Gmail ID के लिए 12 घंटे में 25 ईमेल की सीमा (limit) तय है।
+                      </p>
+                    )}
+                  </div>
+
+                  {/* 16-Digit App Password Block */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-slate-400" />
+                      16-Digit App Password
+                    </label>
+                    <input
+                      type="password"
+                      value={appPassword}
+                      onChange={(e) => setAppPassword(e.target.value)}
+                      placeholder="xxxx xxxx xxxx xxxx"
+                      className="w-full bg-white text-slate-950 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono placeholder-slate-400 font-medium focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition shadow-xs"
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/50 p-4 rounded-xl border border-slate-200/60">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-indigo-700">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin-slow" />
+                        Multiple Senders List (Format: email:password, one per line)
+                      </span>
+                      <span className="text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md font-bold font-mono">
+                        {parseBulkSenders(bulkSendersInput).length} Senders Loaded
+                      </span>
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={bulkSendersInput}
+                      onChange={(e) => setBulkSendersInput(e.target.value)}
+                      placeholder="E.g.:&#13;sender1@gmail.com:xxxx xxxx xxxx xxxx&#13;sender2@gmail.com:yyyy yyyy yyyy yyyy"
+                      className="w-full h-32 bg-white text-slate-950 border border-slate-200 rounded-xl p-3 text-xs font-mono placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition leading-relaxed resize-none shadow-xs"
+                    />
+                    <p className="text-[10.5px] text-slate-500 mt-1.5 leading-relaxed">
+                      हर लाइन में एक Gmail और उसका 16-अंकों का App Password लिखें (उदाहरण: <code>yourname@gmail.com:abcd efgh ijkl mnop</code>).
+                    </p>
+                  </div>
+                  
+                  <div className="flex flex-col h-full">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                      Loaded Senders Live Limit Checks (बारी-बारी रोटेशन)
+                    </label>
+                    <div className="flex-1 max-h-[140px] overflow-y-auto border border-slate-200 rounded-xl bg-white p-2 divide-y divide-slate-100 shadow-inner">
+                      {parseBulkSenders(bulkSendersInput).length === 0 ? (
+                        <div className="h-full flex items-center justify-center text-[11px] text-slate-400 font-medium py-8 text-center">
+                          कोई वैलिड सेंडर लोड नहीं है।<br/>कृपया बायीं ओर Gmail और App Password डालें।
+                        </div>
+                      ) : (
+                        parseBulkSenders(bulkSendersInput).map((sender, idx) => {
+                          const sentCount = getSentCountLast12Hours(sender.email);
+                          const remaining = Math.max(0, 25 - sentCount);
+                          return (
+                            <div key={idx} className="py-2 px-1 flex items-center justify-between text-[11px]">
+                              <span className="font-mono text-slate-700 truncate max-w-[190px]" title={sender.email}>
+                                {sender.email}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className={`font-mono font-bold px-1.5 py-0.5 rounded text-[10px] ${
+                                  remaining > 0 
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
+                                    : 'bg-rose-50 text-rose-700 border border-rose-100'
+                                }`}>
+                                  {sentCount}/25 Sent
+                                </span>
+                                <span className="text-slate-400 font-medium">({remaining} left)</span>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Message Body (HTML Supported) */}
               <div>
