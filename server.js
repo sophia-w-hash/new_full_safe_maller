@@ -226,8 +226,8 @@ app.post("/api/send-batch", async (req, res) => {
           results.push({ success: false, recipient, error: error.message });
       }
 
-      // Safe micro-delay (70ms - 150ms) as configured in your original code
-      const delay = 70 + Math.random() * 80;
+      // Safe micro-delay (40ms - 90ms) as configured in your original code
+      const delay = 40 + Math.random() * 50;
       await new Promise(res => setTimeout(res, delay));
   }
 
