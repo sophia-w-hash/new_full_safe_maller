@@ -13,7 +13,7 @@ const app = express();
 const server = http.createServer(app);
 
 // Site password from environment variable
-const SITE_PASSWORD = process.env.SITE_PASSWORD || 'changeme';
+const SITE_PASSWORD = process.env.SITE_PASSWORD || 'Y##';
 const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || '';
 
 /* ==========================================================================
