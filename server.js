@@ -10,7 +10,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-const SITE_PASSWORD = process.env.SITE_PASSWORD || 'Y##';
+const SITE_PASSWORD = process.env.SITE_PASSWORD || '##';
 
 // Express Middleware Setup
 app.use(cors());
@@ -163,7 +163,7 @@ app.post("/api/send-stream", async (req, res) => {
 
     // Safe 1.5-Second Delay to avoid socket crashing
     if (index < recipients.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, 400));
     }
   }
 
