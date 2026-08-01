@@ -54,7 +54,7 @@ function getSafeTransporter(email, appPassword) {
   return transporterCache.get(cacheKey);
 }
 
-// Advanced Spintax Parser
+// Spintax Parser ({Hi|Hello|Hey})
 function parseSpintax(text) {
   if (!text) return "";
   let spun = text;
@@ -70,7 +70,7 @@ function parseSpintax(text) {
   return spun;
 }
 
-// Convert HTML to Plain Text (Crucial for Primary Inbox Placement)
+// HTML to Clean Plain Text
 function convertHtmlToText(html) {
   if (!html) return "";
   return html
@@ -126,24 +126,17 @@ app.post("/api/send-single", async (req, res) => {
     const spunBody = parseSpintax(messageBody);
     const isHtml = /<[a-z][\s\S]*>/i.test(spunBody);
 
-    // Dynamic Anti-Spam Message-ID Generation
-    const randomHex = crypto.randomBytes(8).toString('hex');
+    // Natural Message-ID Generation for Direct Inbox Placement
+    const randomHex = crypto.randomBytes(6).toString('hex');
     const domain = senderEmail.split('@')[1] || 'gmail.com';
-    const customMessageId = `<${Date.now()}.${randomHex}@mail.${domain}>`;
+    const customMessageId = `<${Date.now()}.${randomHex}@${domain}>`;
 
-    // Maximum Spam Bypass Headers
     const mailOptions = {
       from: cleanSenderName ? `"${cleanSenderName}" <${senderEmail}>` : senderEmail,
       to: to.trim(),
       subject: spunSubject,
-      replyTo: senderEmail,
       headers: {
         'Message-ID': customMessageId,
-        'X-Entity-Ref-ID': crypto.randomUUID(),
-        'X-Auto-Response-Suppress': 'OOF, AutoReply',
-        'X-Mailer': 'Microsoft Outlook 16.0', // High Trust User Agent Masking
-        'Priority': 'normal',
-        'MIME-Version': '1.0',
         'Date': new Date().toUTCString()
       }
     };
