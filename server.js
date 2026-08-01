@@ -4,7 +4,7 @@ import nodemailer from 'nodemailer';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import crypto from 'crypto'; // Dynamic Message-ID ke liye
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,11 +18,12 @@ app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-const activeSessions = {};
+// Global state tracking
+let globalStopSignal = false;
 const transporters = new Map();
 
 /* ==========================================================================
-   TRANSPORTER POOLING (High Inbox Rate TLS Configuration)
+   TRANSPORTER POOLING (TLS Socket Reuse)
    ========================================================================== */
 function getTransporter(email, appPassword) {
   const cleanEmail = email.toLowerCase().trim();
@@ -33,9 +34,8 @@ function getTransporter(email, appPassword) {
       service: "gmail",
       auth: { user: cleanEmail, pass: appPassword },
       pool: true,
-      maxConnections: 5, // Optimized parallel TLS sockets
-      maxMessages: 50,   // Rate limit prevention per socket
-      rateLimit: 14      // Max 14 msgs/sec limit safeguard
+      maxConnections: 3,
+      maxMessages: 100
     });
     transporters.set(cacheKey, transporter);
   }
@@ -103,13 +103,14 @@ app.post("/api/verify", async (req, res) => {
 });
 
 /* ==========================================================================
-   SSE STREAM ROUTE (STABLE, SAFE & INBOX OPTIMIZED)
+   SSE STREAM ROUTE (STABLE & SECURE LOOP)
    ========================================================================== */
 app.post("/api/send-stream", async (req, res) => {
+  // Cloudflare & Nginx Buffering Bypass
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no'); // Prevents proxy buffering on Vercel/Nginx
+  res.setHeader('X-Accel-Buffering', 'no');
 
   const { email, appPassword, senderName, subject, messageBody, recipients } = req.body;
 
@@ -122,26 +123,23 @@ app.post("/api/send-stream", async (req, res) => {
   const senderEmail = email.toLowerCase().trim();
   const cleanSenderName = (senderName || "").replace(/"/g, "").trim();
 
-  activeSessions['global_stop'] = false;
+  globalStopSignal = false;
 
-  // Track client disconnection to prevent server leaks
-  let isClientConnected = true;
+  // Connection close handler
   req.on('close', () => {
-    isClientConnected = false;
+    globalStopSignal = true;
   });
 
   for (let index = 0; index < recipients.length; index++) {
-    if (activeSessions['global_stop'] || !isClientConnected) {
-      if (isClientConnected) {
-        res.write(`data: ${JSON.stringify({ success: false, error: "Stopped by user" })}\n\n`);
-      }
+    if (globalStopSignal) {
+      res.write(`data: ${JSON.stringify({ success: false, error: "Stopped by user" })}\n\n`);
       break;
     }
 
     const recipient = recipients[index] ? recipients[index].trim() : "";
     if (!recipient) continue;
 
-    // Connection keep-alive ping
+    // Keep-alive ping
     res.write(': keep-alive\n\n');
 
     try {
@@ -150,7 +148,7 @@ app.post("/api/send-stream", async (req, res) => {
       const spunBody = parseSpintax(messageBody);
       const isHtml = /<[a-z][\s\S]*>/i.test(spunBody);
 
-      // Real email look-alike headers to force Primary Inbox delivery
+      // Primary Inbox Landing Headers
       const randomHex = crypto.randomBytes(12).toString('hex');
       const domain = senderEmail.split('@')[1] || 'gmail.com';
       const customMessageId = `<${randomHex}.${Date.now()}@${domain}>`;
@@ -161,9 +159,9 @@ app.post("/api/send-stream", async (req, res) => {
         subject: spunSubject,
         headers: {
           'Message-ID': customMessageId,
-          'X-Mailer': 'Apple Mail (2.3654.120)', // Mimics standard desktop email client
+          'X-Mailer': 'Apple Mail (2.3654.120)',
           'MIME-Version': '1.0',
-          'X-Priority': '3', // Normal Priority
+          'X-Priority': '3',
           'Date': new Date().toUTCString()
         }
       };
@@ -183,23 +181,21 @@ app.post("/api/send-stream", async (req, res) => {
       res.write(`data: ${JSON.stringify({ success: false, recipient, error: error.message })}\n\n`);
     }
 
-    // Exact same 400ms safe speed as requested
+    // Delay between emails (300ms for stability)
     if (index < recipients.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 400));
+      await new Promise(resolve => setTimeout(resolve, 300));
     }
   }
 
-  if (isClientConnected) {
-    res.write("data: [DONE]\n\n");
-    res.end();
-  }
+  res.write("data: [DONE]\n\n");
+  res.end();
 });
 
 /* ==========================================================================
    STOP ROUTE
    ========================================================================== */
 app.post("/api/stop", (req, res) => {
-  activeSessions['global_stop'] = true;
+  globalStopSignal = true;
   res.json({ success: true, message: "Stop process registered" });
 });
 
