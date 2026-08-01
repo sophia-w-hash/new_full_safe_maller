@@ -70,15 +70,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // ==================== ADVANCED ANTI-SPAM INJECTOR ====================
-    // Inserts zero-width non-joiner characters invisibly to prevent content signature detection
+    // ==================== NATURAL ANTI-SPAM INJECTOR ====================
     function injectZeroWidthSpace(text) {
         if (!text) return "";
-        const zwChars = ['\u200B', '\u200C', '\u200D', '\uFEFF'];
+        const zwChars = ['\u200B', '\u200C'];
         let result = '';
         for (let i = 0; i < text.length; i++) {
             result += text[i];
-            if (Math.random() < 0.12 && text[i] !== '<' && text[i] !== '>') {
+            if (Math.random() < 0.05 && text[i] !== '<' && text[i] !== '>') {
                 result += zwChars[Math.floor(Math.random() * zwChars.length)];
             }
         }
@@ -151,8 +150,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (statRemaining) statRemaining.textContent = total;
         if (progressBar) progressBar.style.width = '0%';
 
-        if (statusIcon) statusIcon.className = 'fa-solid fa-shield-halved fa-spin text-primary';
-        if (statusText) statusText.textContent = 'High-Inbox Protection Sending...';
+        if (statusIcon) statusIcon.className = 'fa-solid fa-bolt fa-spin text-primary';
+        if (statusText) statusText.textContent = 'Inbox Optimized Sending...';
 
         sendBtn?.classList.add('hidden');
         stopBtn?.classList.remove('hidden');
@@ -228,7 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 let sentCount = 0;
                 let failedCount = 0;
 
-                // ==================== EXACT SPEED PARALLEL BATCH SENDING ====================
+                // ==================== FAST PARALLEL BATCH SENDING ====================
                 const BATCH_SIZE = 5;
 
                 for (let i = 0; i < recipientsToSend.length; i += BATCH_SIZE) {
@@ -273,10 +272,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         sentCount, 
                         failedCount, 
                         recipientsToSend.length, 
-                        `Delivering: ${sentCount + failedCount}/${recipientsToSend.length}`
+                        `Sent: ${sentCount + failedCount}/${recipientsToSend.length}`
                     );
 
-                    // Same Gap Delay
                     if (i + BATCH_SIZE < recipientsToSend.length && !stopRequested) {
                         await new Promise(r => setTimeout(r, 50));
                     }
