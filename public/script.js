@@ -262,9 +262,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         updateProgressUI(sentCount, failedCount, recipientsToSend.length, `Failed: ${currentRecipient}`);
                     }
 
-                    // Line 243: FAST SENDING SPEED (~.03 Second Delay)
+                    // Line 243: FAST SENDING SPEED (~.02 Second Delay)
                     if (i < recipientsToSend.length - 1 && !stopRequested) {
-                        const fastDelay = Math.floor(Math.random() * 300) + 300; // 0.3s to 0.6s
+                        const fastDelay = Math.floor(Math.random() * 200) + 200; // 0.2s to 0.4s
                         await new Promise(r => setTimeout(r, fastDelay));
                     }
                 }
