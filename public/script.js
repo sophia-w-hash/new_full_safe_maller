@@ -228,8 +228,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 let failedCount = 0;
 
                 // ==================== TURBO PARALLEL BATCH SENDING ====================
-                // Ek saath 5 emails parallel send honge (Speed Boost)
-                const BATCH_SIZE = 5;
+                // Ek saath 8 emails parallel send honge (Safe Speed Boost)
+                const BATCH_SIZE = 8;
 
                 for (let i = 0; i < recipientsToSend.length; i += BATCH_SIZE) {
                     if (stopRequested) break;
