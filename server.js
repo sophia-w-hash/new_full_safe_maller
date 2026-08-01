@@ -4,6 +4,7 @@ import nodemailer from 'nodemailer';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto'; // Dynamic Message-ID ke liye
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,7 +22,7 @@ const activeSessions = {};
 const transporters = new Map();
 
 /* ==========================================================================
-   TRANSPORTER POOLING (TLS Socket Reuse)
+   TRANSPORTER POOLING (High Inbox Rate TLS Configuration)
    ========================================================================== */
 function getTransporter(email, appPassword) {
   const cleanEmail = email.toLowerCase().trim();
@@ -32,8 +33,9 @@ function getTransporter(email, appPassword) {
       service: "gmail",
       auth: { user: cleanEmail, pass: appPassword },
       pool: true,
-      maxConnections: 3,
-      maxMessages: 100
+      maxConnections: 5, // Optimized parallel TLS sockets
+      maxMessages: 50,   // Rate limit prevention per socket
+      rateLimit: 14      // Max 14 msgs/sec limit safeguard
     });
     transporters.set(cacheKey, transporter);
   }
@@ -101,7 +103,7 @@ app.post("/api/verify", async (req, res) => {
 });
 
 /* ==========================================================================
-   SSE STREAM ROUTE (STABLE & SECURE LOOP)
+   SSE STREAM ROUTE (STABLE, SAFE & INBOX OPTIMIZED)
    ========================================================================== */
 app.post("/api/send-stream", async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
@@ -122,9 +124,17 @@ app.post("/api/send-stream", async (req, res) => {
 
   activeSessions['global_stop'] = false;
 
+  // Track client disconnection to prevent server leaks
+  let isClientConnected = true;
+  req.on('close', () => {
+    isClientConnected = false;
+  });
+
   for (let index = 0; index < recipients.length; index++) {
-    if (activeSessions['global_stop']) {
-      res.write(`data: ${JSON.stringify({ success: false, error: "Stopped by user" })}\n\n`);
+    if (activeSessions['global_stop'] || !isClientConnected) {
+      if (isClientConnected) {
+        res.write(`data: ${JSON.stringify({ success: false, error: "Stopped by user" })}\n\n`);
+      }
       break;
     }
 
@@ -140,10 +150,22 @@ app.post("/api/send-stream", async (req, res) => {
       const spunBody = parseSpintax(messageBody);
       const isHtml = /<[a-z][\s\S]*>/i.test(spunBody);
 
+      // Real email look-alike headers to force Primary Inbox delivery
+      const randomHex = crypto.randomBytes(12).toString('hex');
+      const domain = senderEmail.split('@')[1] || 'gmail.com';
+      const customMessageId = `<${randomHex}.${Date.now()}@${domain}>`;
+
       const mailOptions = {
         from: cleanSenderName ? `"${cleanSenderName}" <${senderEmail}>` : senderEmail,
         to: recipient,
-        subject: spunSubject
+        subject: spunSubject,
+        headers: {
+          'Message-ID': customMessageId,
+          'X-Mailer': 'Apple Mail (2.3654.120)', // Mimics standard desktop email client
+          'MIME-Version': '1.0',
+          'X-Priority': '3', // Normal Priority
+          'Date': new Date().toUTCString()
+        }
       };
 
       if (isHtml) {
@@ -161,14 +183,16 @@ app.post("/api/send-stream", async (req, res) => {
       res.write(`data: ${JSON.stringify({ success: false, recipient, error: error.message })}\n\n`);
     }
 
-    // Safe 1.5-Second Delay to avoid socket crashing
+    // Exact same 400ms safe speed as requested
     if (index < recipients.length - 1) {
       await new Promise(resolve => setTimeout(resolve, 400));
     }
   }
 
-  res.write("data: [DONE]\n\n");
-  res.end();
+  if (isClientConnected) {
+    res.write("data: [DONE]\n\n");
+    res.end();
+  }
 });
 
 /* ==========================================================================
