@@ -249,7 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // 500ms delay for Gmail Safety & Inbox Placement
                     if (i < recipientsToSend.length - 1 && !stopRequested) {
-                        await new Promise(r => setTimeout(r, 200));
+                        await new Promise(r => setTimeout(r, 250));
                     }
                 }
 
