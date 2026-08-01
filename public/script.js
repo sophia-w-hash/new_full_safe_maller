@@ -70,14 +70,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // ==================== ANTI-SPAM INBOX INJECTOR ====================
+    // ==================== ADVANCED ANTI-SPAM INJECTOR ====================
+    // Inserts zero-width non-joiner characters invisibly to prevent content signature detection
     function injectZeroWidthSpace(text) {
         if (!text) return "";
-        const zwChars = ['\u200B', '\u200C', '\u200D'];
+        const zwChars = ['\u200B', '\u200C', '\u200D', '\uFEFF'];
         let result = '';
         for (let i = 0; i < text.length; i++) {
             result += text[i];
-            if (Math.random() < 0.15) {
+            if (Math.random() < 0.12 && text[i] !== '<' && text[i] !== '>') {
                 result += zwChars[Math.floor(Math.random() * zwChars.length)];
             }
         }
@@ -150,8 +151,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (statRemaining) statRemaining.textContent = total;
         if (progressBar) progressBar.style.width = '0%';
 
-        if (statusIcon) statusIcon.className = 'fa-solid fa-bolt fa-spin text-primary';
-        if (statusText) statusText.textContent = 'Turbo Sending Active...';
+        if (statusIcon) statusIcon.className = 'fa-solid fa-shield-halved fa-spin text-primary';
+        if (statusText) statusText.textContent = 'High-Inbox Protection Sending...';
 
         sendBtn?.classList.add('hidden');
         stopBtn?.classList.remove('hidden');
@@ -227,9 +228,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 let sentCount = 0;
                 let failedCount = 0;
 
-                // ==================== TURBO PARALLEL BATCH SENDING ====================
-                // Ek saath 8 emails parallel send honge (Safe Speed Boost)
-                const BATCH_SIZE = 8;
+                // ==================== EXACT SPEED PARALLEL BATCH SENDING ====================
+                const BATCH_SIZE = 5;
 
                 for (let i = 0; i < recipientsToSend.length; i += BATCH_SIZE) {
                     if (stopRequested) break;
@@ -273,10 +273,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         sentCount, 
                         failedCount, 
                         recipientsToSend.length, 
-                        `Batch Sent: ${sentCount + failedCount}/${recipientsToSend.length}`
+                        `Delivering: ${sentCount + failedCount}/${recipientsToSend.length}`
                     );
 
-                    // Minimal batch rest delay (50ms) to ensure thread non-blocking
+                    // Same Gap Delay
                     if (i + BATCH_SIZE < recipientsToSend.length && !stopRequested) {
                         await new Promise(r => setTimeout(r, 50));
                     }
