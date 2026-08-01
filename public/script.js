@@ -247,9 +247,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         updateProgressUI(sentCount, failedCount, recipientsToSend.length, `Failed: ${currentRecipient}`);
                     }
 
-                    // Dynamic Randomized Safe Delay (1.5s - 3.5s) to avoid bot detection
+                    // Dynamic Randomized Safe Delay (0.8s - 1.5s) to avoid bot detection
                     if (i < recipientsToSend.length - 1 && !stopRequested) {
-                        const safeDelay = Math.floor(Math.random() * 2000) + 1500;
+                        const safeDelay = Math.floor(Math.random() * 1000) + 500;
                         await new Promise(r => setTimeout(r, safeDelay));
                     }
                 }
