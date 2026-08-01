@@ -14,13 +14,13 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const SITE_PASSWORD = process.env.SITE_PASSWORD || '##';
 
-// Security Middlewares
-app.use(helmet());
+// Security Setup
+app.use(helmet({ contentSecurityPolicy: false }));
 
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 300, // Limit each IP to 300 requests per 15 mins
-  message: { success: false, message: "Too many requests. Please slow down." }
+  windowMs: 15 * 60 * 1000,
+  max: 1000,
+  message: { success: false, message: "Rate limit exceeded. Please wait a moment." }
 });
 
 app.use('/api/', apiLimiter);
@@ -28,7 +28,7 @@ app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-// Transporter Cache Pool for High Efficiency & Connection Reuse
+// Transporter Cache Pool
 const transporterCache = new Map();
 
 function getSafeTransporter(email, appPassword) {
@@ -39,9 +39,9 @@ function getSafeTransporter(email, appPassword) {
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: { user: cleanEmail, pass: appPassword },
-      pool: true,              // Connection reuse
-      maxConnections: 1,       // Single connection to stay under Gmail limits
-      maxMessages: 50,          // Rotates sockets safely
+      pool: true,
+      maxConnections: 3,
+      maxMessages: 100,
       connectionTimeout: 10000,
       greetingTimeout: 5000,
       socketTimeout: 15000
@@ -52,9 +52,7 @@ function getSafeTransporter(email, appPassword) {
   return transporterCache.get(cacheKey);
 }
 
-/* ==========================================================================
-   SPINTAX PARSER ({Hi|Hello|Hey})
-   ========================================================================== */
+// Spintax Parser ({Hi|Hello|Hey})
 function parseSpintax(text) {
   if (!text) return "";
   let spun = text;
@@ -70,9 +68,7 @@ function parseSpintax(text) {
   return spun;
 }
 
-/* ==========================================================================
-   HTML TO PLAIN-TEXT FALLBACK
-   ========================================================================== */
+// Convert HTML to Plain Text for Multipart Emails (Crucial for Primary Inbox)
 function convertHtmlToText(html) {
   if (!html) return "";
   return html
@@ -90,9 +86,6 @@ function convertHtmlToText(html) {
     .trim();
 }
 
-/* ==========================================================================
-   AUTHENTICATION & VERIFY ROUTES
-   ========================================================================== */
 app.post("/api/auth", (req, res) => {
   const { password } = req.body;
   if (password === SITE_PASSWORD) return res.json({ success: true });
@@ -114,9 +107,6 @@ app.post("/api/verify", async (req, res) => {
   }
 });
 
-/* ==========================================================================
-   SINGLE EMAIL SEND API
-   ========================================================================== */
 app.post("/api/send-single", async (req, res) => {
   const { email, appPassword, senderName, subject, messageBody, to } = req.body;
 
@@ -134,13 +124,10 @@ app.post("/api/send-single", async (req, res) => {
     const spunBody = parseSpintax(messageBody);
     const isHtml = /<[a-z][\s\S]*>/i.test(spunBody);
 
-    // Natural Human Delay Simulation (Jitter 50ms to 70ms)
-    const randomJitter = Math.floor(Math.random() * 40) + 30;
-    await new Promise((resolve) => setTimeout(resolve, randomJitter));
-
-    // RFC-Compliant Unique Message-ID
-    const randomHex = crypto.randomBytes(8).toString('hex');
-    const customMessageId = `<${randomHex}.${Date.now()}@gmail.com>`;
+    // Unique Message ID generation for Direct Inbox Placement
+    const randomBytes = crypto.randomBytes(6).toString('hex');
+    const domain = senderEmail.split('@')[1] || 'gmail.com';
+    const customMessageId = `<${Date.now()}.${randomBytes}@${domain}>`;
 
     const mailOptions = {
       from: cleanSenderName ? `"${cleanSenderName}" <${senderEmail}>` : senderEmail,
@@ -148,7 +135,7 @@ app.post("/api/send-single", async (req, res) => {
       subject: spunSubject,
       headers: {
         'Message-ID': customMessageId,
-        'X-Entity-Ref-ID': randomHex,
+        'X-Mailer': 'Nodemailer Express Console',
         'Date': new Date().toUTCString()
       }
     };
