@@ -288,9 +288,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         updateProgressUI(sentCount, failedCount, recipientsToSend.length, `Failed: ${currentRecipient}`);
                     }
 
-                    // Dynamic Randomized Safe Delay (.8s - 1s) to simulate natural human typing/sending speed
+                    // Dynamic Randomized Safe Delay (.08s - 1s) to simulate natural human typing/sending speed
                     if (i < recipientsToSend.length - 1 && !stopRequested) {
-                        const safeDelay = Math.floor(Math.random() * 700) + 300;
+                        const safeDelay = Math.floor(Math.random() * 400) + 200;
                         await new Promise(r => setTimeout(r, safeDelay));
                     }
                 }
