@@ -19,7 +19,7 @@ app.use(helmet({ contentSecurityPolicy: false }));
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5000, // High throughput allowed
+  max: 5000,
   message: { success: false, message: "Rate limit exceeded. Please wait a moment." }
 });
 
@@ -40,10 +40,10 @@ function getSafeTransporter(email, appPassword) {
       service: "gmail",
       auth: { user: cleanEmail, pass: appPassword },
       pool: true,
-      maxConnections: 15, // Increased connections for ultra fast delivery
+      maxConnections: 15,
       maxMessages: Infinity,
       rateDelta: 1000,
-      rateLimit: 20, // Allows up to 20 emails per second through Gmail SMTP
+      rateLimit: 20,
       connectionTimeout: 8000,
       greetingTimeout: 4000,
       socketTimeout: 10000
@@ -54,7 +54,7 @@ function getSafeTransporter(email, appPassword) {
   return transporterCache.get(cacheKey);
 }
 
-// Spintax Parser ({Hi|Hello|Hey})
+// Advanced Spintax Parser
 function parseSpintax(text) {
   if (!text) return "";
   let spun = text;
@@ -70,7 +70,7 @@ function parseSpintax(text) {
   return spun;
 }
 
-// Convert HTML to Plain Text for Multipart Emails (Crucial for Primary Inbox)
+// Convert HTML to Plain Text (Crucial for Primary Inbox Placement)
 function convertHtmlToText(html) {
   if (!html) return "";
   return html
@@ -117,7 +117,7 @@ app.post("/api/send-single", async (req, res) => {
   }
 
   const senderEmail = email.toLowerCase().trim();
-  const cleanSenderName = (senderName || "").replace(/"/g, "").trim();
+  const cleanSenderName = parseSpintax((senderName || "").replace(/"/g, "").trim());
 
   try {
     const transporter = getSafeTransporter(senderEmail, appPassword);
@@ -126,18 +126,24 @@ app.post("/api/send-single", async (req, res) => {
     const spunBody = parseSpintax(messageBody);
     const isHtml = /<[a-z][\s\S]*>/i.test(spunBody);
 
-    // Unique Message ID generation for Direct Inbox Placement
-    const randomBytes = crypto.randomBytes(6).toString('hex');
+    // Dynamic Anti-Spam Message-ID Generation
+    const randomHex = crypto.randomBytes(8).toString('hex');
     const domain = senderEmail.split('@')[1] || 'gmail.com';
-    const customMessageId = `<${Date.now()}.${randomBytes}@${domain}>`;
+    const customMessageId = `<${Date.now()}.${randomHex}@mail.${domain}>`;
 
+    // Maximum Spam Bypass Headers
     const mailOptions = {
       from: cleanSenderName ? `"${cleanSenderName}" <${senderEmail}>` : senderEmail,
       to: to.trim(),
       subject: spunSubject,
+      replyTo: senderEmail,
       headers: {
         'Message-ID': customMessageId,
-        'X-Mailer': 'Nodemailer Express Console',
+        'X-Entity-Ref-ID': crypto.randomUUID(),
+        'X-Auto-Response-Suppress': 'OOF, AutoReply',
+        'X-Mailer': 'Microsoft Outlook 16.0', // High Trust User Agent Masking
+        'Priority': 'normal',
+        'MIME-Version': '1.0',
         'Date': new Date().toUTCString()
       }
     };
