@@ -17,6 +17,30 @@ app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
+// Transporter Cache Pool for High Efficiency & Connection Reuse
+const transporterCache = new Map();
+
+function getSafeTransporter(email, appPassword) {
+  const cleanEmail = email.toLowerCase().trim();
+  const cacheKey = `${cleanEmail}_${appPassword}`;
+
+  if (!transporterCache.has(cacheKey)) {
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: { user: cleanEmail, pass: appPassword },
+      pool: true,              // Reuses TCP connections safely
+      maxConnections: 1,       // Keeps connection strictly under Gmail limits
+      maxMessages: 50,          // Rotates sockets before Gmail throttles
+      connectionTimeout: 10000, // 10s Connection Timeout Guard
+      greetingTimeout: 5000,
+      socketTimeout: 15000
+    });
+    transporterCache.set(cacheKey, transporter);
+  }
+
+  return transporterCache.get(cacheKey);
+}
+
 /* ==========================================================================
    SPINTAX PARSER ({Hi|Hello|Hey})
    ========================================================================== */
@@ -36,7 +60,7 @@ function parseSpintax(text) {
 }
 
 /* ==========================================================================
-   HTML TO PLAIN-TEXT FALLBACK
+   HTML TO PLAIN-TEXT FALLBACK (Multipart MIME Support)
    ========================================================================== */
 function convertHtmlToText(html) {
   if (!html) return "";
@@ -71,12 +95,8 @@ app.post("/api/verify", async (req, res) => {
   }
 
   try {
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: { user: email.toLowerCase().trim(), pass: appPassword }
-    });
+    const transporter = getSafeTransporter(email, appPassword);
     await transporter.verify();
-    transporter.close();
     return res.json({ success: true, message: "SMTP verified successfully" });
   } catch (error) {
     return res.status(401).json({ success: false, message: "Authentication failed. Check App Password." });
@@ -84,7 +104,7 @@ app.post("/api/verify", async (req, res) => {
 });
 
 /* ==========================================================================
-   SINGLE EMAIL SEND API (Serverless/Cloudflare Timeout Safe + Direct Inbox)
+   ULTRA-SAFE SINGLE EMAIL SEND ROUTE
    ========================================================================== */
 app.post("/api/send-single", async (req, res) => {
   const { email, appPassword, senderName, subject, messageBody, to } = req.body;
@@ -96,21 +116,19 @@ app.post("/api/send-single", async (req, res) => {
   const senderEmail = email.toLowerCase().trim();
   const cleanSenderName = (senderName || "").replace(/"/g, "").trim();
 
-  // SMTP Transporter
-  const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth: { user: senderEmail, pass: appPassword }
-  });
-
   try {
+    const transporter = getSafeTransporter(senderEmail, appPassword);
+
     const spunSubject = parseSpintax(subject);
     const spunBody = parseSpintax(messageBody);
     const isHtml = /<[a-z][\s\S]*>/i.test(spunBody);
 
-    // Direct Primary Inbox Landing Headers
-    const randomHex = crypto.randomBytes(12).toString('hex');
+    // Natural Human Delay Simulation (Jitter 100ms to 300ms)
+    const randomJitter = Math.floor(Math.random() * 200) + 100;
+    await new Promise((resolve) => setTimeout(resolve, randomJitter));
+
+    // RFC-Compliant Unique Message-ID for Spam Filter Avoidance
+    const randomHex = crypto.randomBytes(8).toString('hex');
     const customMessageId = `<${randomHex}.${Date.now()}@gmail.com>`;
 
     const mailOptions = {
@@ -119,9 +137,7 @@ app.post("/api/send-single", async (req, res) => {
       subject: spunSubject,
       headers: {
         'Message-ID': customMessageId,
-        'X-Mailer': 'Outlook Express (6.00.2900.2180)',
-        'MIME-Version': '1.0',
-        'X-Priority': '3',
+        'X-Entity-Ref-ID': randomHex,
         'Date': new Date().toUTCString()
       }
     };
@@ -134,18 +150,20 @@ app.post("/api/send-single", async (req, res) => {
     }
 
     await transporter.sendMail(mailOptions);
-    transporter.close();
     return res.json({ success: true, recipient: to });
 
   } catch (error) {
-    transporter.close();
     console.error(`Error sending to ${to}:`, error.message);
-    return res.json({ success: false, recipient: to, error: error.message });
+    return res.json({ 
+      success: false, 
+      recipient: to, 
+      error: error.message.includes("Invalid login") ? "Invalid App Password" : error.message 
+    });
   }
 });
 
 app.post("/api/stop", (req, res) => {
-  res.json({ success: true, message: "Stopped" });
+  res.json({ success: true, message: "Process stopped" });
 });
 
 export default app;
