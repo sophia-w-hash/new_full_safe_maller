@@ -5,6 +5,8 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,12 +14,21 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const SITE_PASSWORD = process.env.SITE_PASSWORD || '##';
 
-// Middleware Setup
+// Security Middlewares
+app.use(helmet());
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 300, // Limit each IP to 300 requests per 15 mins
+  message: { success: false, message: "Too many requests. Please slow down." }
+});
+
+app.use('/api/', apiLimiter);
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-// Transporter Cache Pool (Prevents IP/Port Saturated Blocks)
+// Transporter Cache Pool for High Efficiency & Connection Reuse
 const transporterCache = new Map();
 
 function getSafeTransporter(email, appPassword) {
@@ -28,9 +39,9 @@ function getSafeTransporter(email, appPassword) {
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: { user: cleanEmail, pass: appPassword },
-      pool: true,              // Reuses TCP connection safely
+      pool: true,              // Connection reuse
       maxConnections: 1,       // Single connection to stay under Gmail limits
-      maxMessages: 50,          // Refresh socket after 50 emails
+      maxMessages: 50,          // Rotates sockets safely
       connectionTimeout: 10000,
       greetingTimeout: 5000,
       socketTimeout: 15000
@@ -60,7 +71,7 @@ function parseSpintax(text) {
 }
 
 /* ==========================================================================
-   HTML TO PLAIN-TEXT CONVERTER
+   HTML TO PLAIN-TEXT FALLBACK
    ========================================================================== */
 function convertHtmlToText(html) {
   if (!html) return "";
@@ -80,7 +91,7 @@ function convertHtmlToText(html) {
 }
 
 /* ==========================================================================
-   AUTHENTICATION & SMTP VERIFICATION ROUTES
+   AUTHENTICATION & VERIFY ROUTES
    ========================================================================== */
 app.post("/api/auth", (req, res) => {
   const { password } = req.body;
@@ -104,7 +115,7 @@ app.post("/api/verify", async (req, res) => {
 });
 
 /* ==========================================================================
-   SINGLE EMAIL SEND ROUTE (Prevents Timeout & Direct Inbox Enabled)
+   SINGLE EMAIL SEND API
    ========================================================================== */
 app.post("/api/send-single", async (req, res) => {
   const { email, appPassword, senderName, subject, messageBody, to } = req.body;
@@ -123,11 +134,11 @@ app.post("/api/send-single", async (req, res) => {
     const spunBody = parseSpintax(messageBody);
     const isHtml = /<[a-z][\s\S]*>/i.test(spunBody);
 
-    // Human Jitter Delay (100ms to 300ms)
+    // Natural Human Delay Simulation (Jitter 100ms to 300ms)
     const randomJitter = Math.floor(Math.random() * 200) + 100;
     await new Promise((resolve) => setTimeout(resolve, randomJitter));
 
-    // Anti-Spam Compliant Headers
+    // RFC-Compliant Unique Message-ID
     const randomHex = crypto.randomBytes(8).toString('hex');
     const customMessageId = `<${randomHex}.${Date.now()}@gmail.com>`;
 
@@ -164,6 +175,11 @@ app.post("/api/send-single", async (req, res) => {
 
 app.post("/api/stop", (req, res) => {
   res.json({ success: true, message: "Process stopped" });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
 
 export default app;
