@@ -40,7 +40,7 @@ function getSafeTransporter(email, appPassword) {
       service: "gmail",
       auth: { user: cleanEmail, pass: appPassword },
       pool: true,
-      maxConnections: 3,
+      maxConnections: 8,
       maxMessages: 100,
       connectionTimeout: 10000,
       greetingTimeout: 5000,
