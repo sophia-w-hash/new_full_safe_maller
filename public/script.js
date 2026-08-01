@@ -247,9 +247,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         updateProgressUI(sentCount, failedCount, recipientsToSend.length, `Failed: ${currentRecipient}`);
                     }
 
-                    // 500ms safety delay (Line 243)
+                    // 300ms safety delay (Line 243)
                     if (i < recipientsToSend.length - 1 && !stopRequested) {
-                        await new Promise(r => setTimeout(r, 500));
+                        await new Promise(r => setTimeout(r, 300));
                     }
                 }
 
