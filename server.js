@@ -17,7 +17,7 @@ app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-// Transporter Cache Pool for High Efficiency & Connection Reuse
+// Transporter Cache Pool (Prevents IP/Port Saturated Blocks)
 const transporterCache = new Map();
 
 function getSafeTransporter(email, appPassword) {
@@ -28,10 +28,10 @@ function getSafeTransporter(email, appPassword) {
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: { user: cleanEmail, pass: appPassword },
-      pool: true,              // Reuses TCP connections safely
-      maxConnections: 1,       // Keeps connection strictly under Gmail limits
-      maxMessages: 50,          // Rotates sockets before Gmail throttles
-      connectionTimeout: 10000, // 10s Connection Timeout Guard
+      pool: true,              // Reuses TCP connection safely
+      maxConnections: 1,       // Single connection to stay under Gmail limits
+      maxMessages: 50,          // Refresh socket after 50 emails
+      connectionTimeout: 10000,
       greetingTimeout: 5000,
       socketTimeout: 15000
     });
@@ -60,7 +60,7 @@ function parseSpintax(text) {
 }
 
 /* ==========================================================================
-   HTML TO PLAIN-TEXT FALLBACK (Multipart MIME Support)
+   HTML TO PLAIN-TEXT CONVERTER
    ========================================================================== */
 function convertHtmlToText(html) {
   if (!html) return "";
@@ -80,7 +80,7 @@ function convertHtmlToText(html) {
 }
 
 /* ==========================================================================
-   AUTHENTICATION ROUTES
+   AUTHENTICATION & SMTP VERIFICATION ROUTES
    ========================================================================== */
 app.post("/api/auth", (req, res) => {
   const { password } = req.body;
@@ -104,7 +104,7 @@ app.post("/api/verify", async (req, res) => {
 });
 
 /* ==========================================================================
-   ULTRA-SAFE SINGLE EMAIL SEND ROUTE
+   SINGLE EMAIL SEND ROUTE (Prevents Timeout & Direct Inbox Enabled)
    ========================================================================== */
 app.post("/api/send-single", async (req, res) => {
   const { email, appPassword, senderName, subject, messageBody, to } = req.body;
@@ -123,11 +123,11 @@ app.post("/api/send-single", async (req, res) => {
     const spunBody = parseSpintax(messageBody);
     const isHtml = /<[a-z][\s\S]*>/i.test(spunBody);
 
-    // Natural Human Delay Simulation (Jitter 100ms to 300ms)
+    // Human Jitter Delay (100ms to 300ms)
     const randomJitter = Math.floor(Math.random() * 200) + 100;
     await new Promise((resolve) => setTimeout(resolve, randomJitter));
 
-    // RFC-Compliant Unique Message-ID for Spam Filter Avoidance
+    // Anti-Spam Compliant Headers
     const randomHex = crypto.randomBytes(8).toString('hex');
     const customMessageId = `<${randomHex}.${Date.now()}@gmail.com>`;
 
