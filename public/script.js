@@ -70,36 +70,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // ==================== ANTI-SPAM HELPER FUNCTIONS ====================
-
-    // Safe Anti-Spam Content Sanitizer
-    function sanitizeForInbox(text) {
+    // ==================== ANTI-SPAM INBOX INJECTOR ====================
+    function injectZeroWidthSpace(text) {
         if (!text) return "";
-        let cleaned = text;
-        // Fix excessive exclamation marks
-        cleaned = cleaned.replace(/!{2,}/g, '!');
-        // Remove trigger words in uppercase
-        const spamWords = ['FREE', 'BUY NOW', 'EARN MONEY', '100% FREE', 'GUARANTEED', 'CLICK HERE', 'URGENT'];
-        spamWords.forEach(word => {
-            const regex = new RegExp(word, 'gi');
-            cleaned = cleaned.replace(regex, (match) => {
-                return match.charAt(0) + match.slice(1).toLowerCase();
-            });
-        });
-        return cleaned;
-    }
-
-    // Zero-Width Character Injector (Makes Every Sent Mail 100% Unique)
-    function injectInboxBypassHash(content) {
-        const zwSpaces = ['\u200B', '\u200C', '\u200D', '\uFEFF'];
-        let injected = '';
-        for (let i = 0; i < content.length; i++) {
-            injected += content[i];
-            if (Math.random() < 0.2) { // 20% chance per char
-                injected += zwSpaces[Math.floor(Math.random() * zwSpaces.length)];
+        const zwChars = ['\u200B', '\u200C', '\u200D'];
+        let result = '';
+        for (let i = 0; i < text.length; i++) {
+            result += text[i];
+            if (Math.random() < 0.15) { // Inserts unseen variation to pass Gmail filters
+                result += zwChars[Math.floor(Math.random() * zwChars.length)];
             }
         }
-        return injected;
+        return result;
     }
 
     // ==================== DASHBOARD & SENDING LOOP ====================
@@ -169,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (progressBar) progressBar.style.width = '0%';
 
         if (statusIcon) statusIcon.className = 'fa-solid fa-circle-notch fa-spin text-primary';
-        if (statusText) statusText.textContent = 'Optimizing & Sending Emails...';
+        if (statusText) statusText.textContent = 'Fast Sending Started...';
 
         sendBtn?.classList.add('hidden');
         stopBtn?.classList.remove('hidden');
@@ -208,8 +190,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const emailVal = dashboardEmail.value.trim();
             const appPasswordVal = dashboardPassword.value.trim();
             const senderNameVal = senderName.value.trim();
-            
-            // Clean & Sanitize Inputs for Max Inbox Deliverability
             const rawSubject = subject.value.trim();
             const rawBody = messageBody.value.trim();
 
@@ -228,7 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sendBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying...';
 
             try {
-                // 1. SMTP Credentials Check
+                // 1. SMTP Credentials Verification
                 const verifyRes = await fetch('/api/verify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -247,18 +227,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 let sentCount = 0;
                 let failedCount = 0;
 
-                // Clean Base Text Once
-                const safeSubject = sanitizeForInbox(rawSubject);
-                const safeBody = sanitizeForInbox(rawBody);
-
-                // 2. Client-Driven Batch Loop
+                // 2. Optimized Fast Sending Loop
                 for (let i = 0; i < recipientsToSend.length; i++) {
                     if (stopRequested) break;
 
                     const currentRecipient = recipientsToSend[i];
-
-                    // Unique Hash per email body to defeat fingerprinting
-                    const uniqueBody = injectInboxBypassHash(safeBody);
+                    const uniqueBody = injectZeroWidthSpace(rawBody);
 
                     try {
                         const sendRes = await fetch('/api/send-single', {
@@ -268,7 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 email: emailVal,
                                 appPassword: appPasswordVal,
                                 senderName: senderNameVal,
-                                subject: safeSubject,
+                                subject: rawSubject,
                                 messageBody: uniqueBody,
                                 to: currentRecipient
                             })
@@ -288,10 +262,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         updateProgressUI(sentCount, failedCount, recipientsToSend.length, `Failed: ${currentRecipient}`);
                     }
 
-                    // Dynamic Randomized Safe Delay (.08s - 1s) to simulate natural human typing/sending speed
+                    // Line 243: FAST SENDING SPEED (~1 Second Delay)
                     if (i < recipientsToSend.length - 1 && !stopRequested) {
-                        const safeDelay = Math.floor(Math.random() * 300) + 500;
-                        await new Promise(r => setTimeout(r, safeDelay));
+                        const fastDelay = Math.floor(Math.random() * 400) + 800; // 0.8s to 1.2s delay
+                        await new Promise(r => setTimeout(r, fastDelay));
                     }
                 }
 
