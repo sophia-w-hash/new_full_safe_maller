@@ -10,37 +10,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-
 const SITE_PASSWORD = process.env.SITE_PASSWORD || '##';
 
-// Express Middleware Setup
+// Middleware Setup
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.static(path.join(__dirname, "public")));
-
-// Global state tracking
-let globalStopSignal = false;
-const transporters = new Map();
-
-/* ==========================================================================
-   TRANSPORTER POOLING (TLS Socket Reuse)
-   ========================================================================== */
-function getTransporter(email, appPassword) {
-  const cleanEmail = email.toLowerCase().trim();
-  const cacheKey = `${cleanEmail}_${appPassword}`;
-
-  if (!transporters.has(cacheKey)) {
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: { user: cleanEmail, pass: appPassword },
-      pool: true,
-      maxConnections: 3,
-      maxMessages: 100
-    });
-    transporters.set(cacheKey, transporter);
-  }
-  return transporters.get(cacheKey);
-}
 
 /* ==========================================================================
    SPINTAX PARSER ({Hi|Hello|Hey})
@@ -61,7 +36,7 @@ function parseSpintax(text) {
 }
 
 /* ==========================================================================
-   HTML TO PLAIN-TEXT FALLBACK (Dual Multipart MIME)
+   HTML TO PLAIN-TEXT FALLBACK
    ========================================================================== */
 function convertHtmlToText(html) {
   if (!html) return "";
@@ -91,11 +66,17 @@ app.post("/api/auth", (req, res) => {
 
 app.post("/api/verify", async (req, res) => {
   const { email, appPassword } = req.body;
-  if (!email || !appPassword) return res.status(400).json({ success: false, message: "Credentials required" });
+  if (!email || !appPassword) {
+    return res.status(400).json({ success: false, message: "Credentials required" });
+  }
 
   try {
-    const transporter = getTransporter(email, appPassword);
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: { user: email.toLowerCase().trim(), pass: appPassword }
+    });
     await transporter.verify();
+    transporter.close();
     return res.json({ success: true, message: "SMTP verified successfully" });
   } catch (error) {
     return res.status(401).json({ success: false, message: "Authentication failed. Check App Password." });
@@ -103,103 +84,68 @@ app.post("/api/verify", async (req, res) => {
 });
 
 /* ==========================================================================
-   SSE STREAM ROUTE (STABLE & SECURE LOOP)
+   SINGLE EMAIL SEND API (Serverless/Cloudflare Timeout Safe + Direct Inbox)
    ========================================================================== */
-app.post("/api/send-stream", async (req, res) => {
-  // Cloudflare & Nginx Buffering Bypass
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache, no-transform');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no');
+app.post("/api/send-single", async (req, res) => {
+  const { email, appPassword, senderName, subject, messageBody, to } = req.body;
 
-  const { email, appPassword, senderName, subject, messageBody, recipients } = req.body;
-
-  if (!email || !appPassword || !Array.isArray(recipients) || recipients.length === 0) {
-    res.write(`data: ${JSON.stringify({ success: false, error: "Missing required fields" })}\n\n`);
-    res.end();
-    return;
+  if (!email || !appPassword || !to) {
+    return res.status(400).json({ success: false, message: "Missing required fields" });
   }
 
   const senderEmail = email.toLowerCase().trim();
   const cleanSenderName = (senderName || "").replace(/"/g, "").trim();
 
-  globalStopSignal = false;
-
-  // Connection close handler
-  req.on('close', () => {
-    globalStopSignal = true;
+  // SMTP Transporter
+  const transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true,
+    auth: { user: senderEmail, pass: appPassword }
   });
 
-  for (let index = 0; index < recipients.length; index++) {
-    if (globalStopSignal) {
-      res.write(`data: ${JSON.stringify({ success: false, error: "Stopped by user" })}\n\n`);
-      break;
-    }
+  try {
+    const spunSubject = parseSpintax(subject);
+    const spunBody = parseSpintax(messageBody);
+    const isHtml = /<[a-z][\s\S]*>/i.test(spunBody);
 
-    const recipient = recipients[index] ? recipients[index].trim() : "";
-    if (!recipient) continue;
+    // Direct Primary Inbox Landing Headers
+    const randomHex = crypto.randomBytes(12).toString('hex');
+    const customMessageId = `<${randomHex}.${Date.now()}@gmail.com>`;
 
-    // Keep-alive ping
-    res.write(': keep-alive\n\n');
-
-    try {
-      const transporter = getTransporter(email, appPassword);
-      const spunSubject = parseSpintax(subject);
-      const spunBody = parseSpintax(messageBody);
-      const isHtml = /<[a-z][\s\S]*>/i.test(spunBody);
-
-      // Primary Inbox Landing Headers
-      const randomHex = crypto.randomBytes(12).toString('hex');
-      const domain = senderEmail.split('@')[1] || 'gmail.com';
-      const customMessageId = `<${randomHex}.${Date.now()}@${domain}>`;
-
-      const mailOptions = {
-        from: cleanSenderName ? `"${cleanSenderName}" <${senderEmail}>` : senderEmail,
-        to: recipient,
-        subject: spunSubject,
-        headers: {
-          'Message-ID': customMessageId,
-          'X-Mailer': 'Apple Mail (2.3654.120)',
-          'MIME-Version': '1.0',
-          'X-Priority': '3',
-          'Date': new Date().toUTCString()
-        }
-      };
-
-      if (isHtml) {
-        mailOptions.html = spunBody;
-        mailOptions.text = convertHtmlToText(spunBody);
-      } else {
-        mailOptions.text = spunBody;
+    const mailOptions = {
+      from: cleanSenderName ? `"${cleanSenderName}" <${senderEmail}>` : senderEmail,
+      to: to.trim(),
+      subject: spunSubject,
+      headers: {
+        'Message-ID': customMessageId,
+        'X-Mailer': 'Outlook Express (6.00.2900.2180)',
+        'MIME-Version': '1.0',
+        'X-Priority': '3',
+        'Date': new Date().toUTCString()
       }
+    };
 
-      await transporter.sendMail(mailOptions);
-      res.write(`data: ${JSON.stringify({ success: true, recipient })}\n\n`);
-
-    } catch (error) {
-      console.error(`Error sending to ${recipient}:`, error.message);
-      res.write(`data: ${JSON.stringify({ success: false, recipient, error: error.message })}\n\n`);
+    if (isHtml) {
+      mailOptions.html = spunBody;
+      mailOptions.text = convertHtmlToText(spunBody);
+    } else {
+      mailOptions.text = spunBody;
     }
 
-    // Delay between emails (300ms for stability)
-    if (index < recipients.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 300));
-    }
+    await transporter.sendMail(mailOptions);
+    transporter.close();
+    return res.json({ success: true, recipient: to });
+
+  } catch (error) {
+    transporter.close();
+    console.error(`Error sending to ${to}:`, error.message);
+    return res.json({ success: false, recipient: to, error: error.message });
   }
-
-  res.write("data: [DONE]\n\n");
-  res.end();
 });
 
-/* ==========================================================================
-   STOP ROUTE
-   ========================================================================== */
 app.post("/api/stop", (req, res) => {
-  globalStopSignal = true;
-  res.json({ success: true, message: "Stop process registered" });
+  res.json({ success: true, message: "Stopped" });
 });
 
-/* ==========================================================================
-   VERCEL / SERVERLESS HANDLER EXPORT
-   ========================================================================== */
 export default app;
