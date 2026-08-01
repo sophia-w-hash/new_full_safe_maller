@@ -19,7 +19,7 @@ app.use(helmet({ contentSecurityPolicy: false }));
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 1000,
+  max: 5000, // High throughput allowed
   message: { success: false, message: "Rate limit exceeded. Please wait a moment." }
 });
 
@@ -40,11 +40,13 @@ function getSafeTransporter(email, appPassword) {
       service: "gmail",
       auth: { user: cleanEmail, pass: appPassword },
       pool: true,
-      maxConnections: 8,
-      maxMessages: 100,
-      connectionTimeout: 10000,
-      greetingTimeout: 5000,
-      socketTimeout: 15000
+      maxConnections: 15, // Increased connections for ultra fast delivery
+      maxMessages: Infinity,
+      rateDelta: 1000,
+      rateLimit: 20, // Allows up to 20 emails per second through Gmail SMTP
+      connectionTimeout: 8000,
+      greetingTimeout: 4000,
+      socketTimeout: 10000
     });
     transporterCache.set(cacheKey, transporter);
   }
