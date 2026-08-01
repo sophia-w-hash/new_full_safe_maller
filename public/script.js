@@ -166,6 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sendBtn.disabled = false;
             sendBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send All';
         }
+        isSending = false;
     }
 
     if (sendBtn) {
@@ -193,6 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sendBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying...';
 
             try {
+                // 1. Verify Credentials
                 const verifyRes = await fetch('/api/verify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -211,57 +213,46 @@ document.addEventListener('DOMContentLoaded', () => {
                 let sentCount = 0;
                 let failedCount = 0;
 
-                const response = await fetch('/api/send-stream', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        email: emailVal,
-                        appPassword: appPasswordVal,
-                        senderName: senderNameVal,
-                        subject: subjectVal,
-                        messageBody: messageBodyVal,
-                        recipients: recipientsToSend
-                    })
-                });
-
-                if (!response.ok) throw new Error('Streaming failed.');
-
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let buffer = '';
-
-                while (true) {
+                // 2. Client-Side Loop (Bypasses Server Timeout Limits)
+                for (let i = 0; i < recipientsToSend.length; i++) {
                     if (stopRequested) break;
 
-                    const { done, value } = await reader.read();
-                    if (done) break;
+                    const currentRecipient = recipientsToSend[i];
 
-                    buffer += decoder.decode(value, { stream: true });
-                    const lines = buffer.split('\n\n');
-                    buffer = lines.pop();
+                    try {
+                        const sendRes = await fetch('/api/send-single', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                email: emailVal,
+                                appPassword: appPasswordVal,
+                                senderName: senderNameVal,
+                                subject: subjectVal,
+                                messageBody: messageBodyVal,
+                                to: currentRecipient
+                            })
+                        });
 
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const dataStr = line.replace('data: ', '').trim();
-                            if (dataStr === '[DONE]') break;
+                        const sendResult = await sendRes.json();
 
-                            try {
-                                const event = JSON.parse(dataStr);
-                                if (event.success) {
-                                    sentCount++;
-                                    updateProgressUI(sentCount, failedCount, recipientsToSend.length, `Sent: ${event.recipient}`);
-                                } else {
-                                    failedCount++;
-                                    updateProgressUI(sentCount, failedCount, recipientsToSend.length, `Failed: ${event.recipient}`);
-                                }
-                            } catch (e) {
-                                console.error('Parse error:', e);
-                            }
+                        if (sendRes.ok && sendResult.success) {
+                            sentCount++;
+                            updateProgressUI(sentCount, failedCount, recipientsToSend.length, `Sent: ${currentRecipient}`);
+                        } else {
+                            failedCount++;
+                            updateProgressUI(sentCount, failedCount, recipientsToSend.length, `Failed: ${currentRecipient}`);
                         }
+                    } catch (e) {
+                        failedCount++;
+                        updateProgressUI(sentCount, failedCount, recipientsToSend.length, `Failed: ${currentRecipient}`);
+                    }
+
+                    // 500ms delay for Gmail Safety & Inbox Placement
+                    if (i < recipientsToSend.length - 1 && !stopRequested) {
+                        await new Promise(r => setTimeout(r, 500));
                     }
                 }
 
-                isSending = false;
                 if (stopRequested) {
                     if (statusIcon) statusIcon.className = 'fa-solid fa-circle-stop text-danger';
                     if (statusText) statusText.textContent = 'Process stopped.';
@@ -275,24 +266,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error(err);
                 alert('Connection error occurred.');
             } finally {
-                isSending = false;
                 finishSendingUI();
             }
         });
     }
 
     if (stopBtn) {
-        stopBtn.addEventListener('click', async () => {
+        stopBtn.addEventListener('click', () => {
             stopRequested = true;
             if (statusIcon) statusIcon.className = 'fa-solid fa-spinner fa-spin text-warning';
             if (statusText) statusText.textContent = 'Stopping send process...';
             stopBtn.disabled = true;
-
-            try {
-                await fetch('/api/stop', { method: 'POST' });
-            } catch (e) {
-                console.error("Stop error", e);
-            }
         });
     }
 });
