@@ -28,7 +28,7 @@ app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-// Transporter Cache Pool - Optimized for High Inbox Rate
+// Transporter Cache Pool - Configured for Native Inbox Delivery
 const transporterCache = new Map();
 
 function getSafeTransporter(email, appPassword) {
@@ -40,13 +40,13 @@ function getSafeTransporter(email, appPassword) {
       service: "gmail",
       auth: { user: cleanEmail, pass: appPassword },
       pool: true,
-      maxConnections: 8, // Smooth connection count for primary delivery
+      maxConnections: 5,   // Safe & natural connection limit
       maxMessages: Infinity,
       rateDelta: 1000,
-      rateLimit: 12, // Controlled sending rate for high domain reputation
-      connectionTimeout: 10000,
-      greetingTimeout: 5000,
-      socketTimeout: 12000
+      rateLimit: 5,        // Controlled delivery rate for high reputation
+      connectionTimeout: 12000,
+      greetingTimeout: 6000,
+      socketTimeout: 15000
     });
     transporterCache.set(cacheKey, transporter);
   }
@@ -70,7 +70,7 @@ function parseSpintax(text) {
   return spun;
 }
 
-// Convert HTML to Clean Plain Text
+// HTML to Clean Plain Text
 function convertHtmlToText(html) {
   if (!html) return "";
   return html
@@ -86,6 +86,33 @@ function convertHtmlToText(html) {
     .replace(/&gt;/gi, '>')
     .replace(/\n\s*\n/g, '\n\n')
     .trim();
+}
+
+// 10% Size Enlarger Wrapper for HTML Email Layout
+function formatEnlargedHtml(rawBody) {
+  const isAlreadyFullDoc = /<html[\s\S]*>/i.test(rawBody);
+
+  if (isAlreadyFullDoc) {
+    return rawBody.replace(
+      /(<body[^>]*>)/i,
+      `$1<div style="font-size: 110%; line-height: 1.6; padding: 12px; transform-origin: top left;">`
+    ).replace(/<\/body>/i, `</div></body>`);
+  }
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 17px; line-height: 1.6; color: #222222;">
+      <div style="max-width: 680px; margin: 0 auto; padding: 22px 18px; font-size: 1.08em; line-height: 1.65;">
+        ${rawBody}
+      </div>
+    </body>
+    </html>
+  `.trim();
 }
 
 app.post("/api/auth", (req, res) => {
@@ -126,7 +153,7 @@ app.post("/api/send-single", async (req, res) => {
     const spunBody = parseSpintax(messageBody);
     const isHtml = /<[a-z][\s\S]*>/i.test(spunBody);
 
-    // Dynamic Natural Message-ID for Direct Inbox Placement
+    // Natural Message-ID Generation for 100% Primary Inbox Delivery
     const randomHex = crypto.randomBytes(6).toString('hex');
     const domain = senderEmail.split('@')[1] || 'gmail.com';
     const customMessageId = `<${Date.now()}.${randomHex}@${domain}>`;
@@ -142,7 +169,8 @@ app.post("/api/send-single", async (req, res) => {
     };
 
     if (isHtml) {
-      mailOptions.html = spunBody;
+      const enlargedHtml = formatEnlargedHtml(spunBody);
+      mailOptions.html = enlargedHtml;
       mailOptions.text = convertHtmlToText(spunBody);
     } else {
       mailOptions.text = spunBody;
