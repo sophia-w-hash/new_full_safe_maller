@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let result = '';
         for (let i = 0; i < text.length; i++) {
             result += text[i];
-            if (Math.random() < 0.15) { // Inserts unseen variation to pass Gmail filters
+            if (Math.random() < 0.15) {
                 result += zwChars[Math.floor(Math.random() * zwChars.length)];
             }
         }
@@ -150,8 +150,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (statRemaining) statRemaining.textContent = total;
         if (progressBar) progressBar.style.width = '0%';
 
-        if (statusIcon) statusIcon.className = 'fa-solid fa-circle-notch fa-spin text-primary';
-        if (statusText) statusText.textContent = 'Fast Sending Started...';
+        if (statusIcon) statusIcon.className = 'fa-solid fa-bolt fa-spin text-primary';
+        if (statusText) statusText.textContent = 'Turbo Sending Active...';
 
         sendBtn?.classList.add('hidden');
         stopBtn?.classList.remove('hidden');
@@ -191,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const appPasswordVal = dashboardPassword.value.trim();
             const senderNameVal = senderName.value.trim();
             const rawSubject = subject.value.trim();
-            const rawBody = messageBody.value.trim();
+            const rawBody = messageBody.body ? messageBody.body.trim() : messageBody.value.trim();
 
             if (!emailVal || !appPasswordVal || !senderNameVal || !rawSubject || !rawBody) {
                 return alert('Please fill in all input fields.');
@@ -227,45 +227,58 @@ document.addEventListener('DOMContentLoaded', () => {
                 let sentCount = 0;
                 let failedCount = 0;
 
-                // 2. Optimized Fast Sending Loop
-                for (let i = 0; i < recipientsToSend.length; i++) {
+                // ==================== TURBO PARALLEL BATCH SENDING ====================
+                // Ek saath 5 emails parallel send honge (Speed Boost)
+                const BATCH_SIZE = 5;
+
+                for (let i = 0; i < recipientsToSend.length; i += BATCH_SIZE) {
                     if (stopRequested) break;
 
-                    const currentRecipient = recipientsToSend[i];
-                    const uniqueBody = injectZeroWidthSpace(rawBody);
+                    const batch = recipientsToSend.slice(i, i + BATCH_SIZE);
 
-                    try {
-                        const sendRes = await fetch('/api/send-single', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                email: emailVal,
-                                appPassword: appPasswordVal,
-                                senderName: senderNameVal,
-                                subject: rawSubject,
-                                messageBody: uniqueBody,
-                                to: currentRecipient
-                            })
-                        });
+                    const sendPromises = batch.map(async (recipient) => {
+                        const uniqueBody = injectZeroWidthSpace(rawBody);
+                        try {
+                            const sendRes = await fetch('/api/send-single', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    email: emailVal,
+                                    appPassword: appPasswordVal,
+                                    senderName: senderNameVal,
+                                    subject: rawSubject,
+                                    messageBody: uniqueBody,
+                                    to: recipient
+                                })
+                            });
 
-                        const sendResult = await sendRes.json();
+                            const sendResult = await sendRes.json();
+                            return { success: sendRes.ok && sendResult.success, recipient };
+                        } catch (e) {
+                            return { success: false, recipient };
+                        }
+                    });
 
-                        if (sendRes.ok && sendResult.success) {
+                    const results = await Promise.all(sendPromises);
+
+                    results.forEach(res => {
+                        if (res.success) {
                             sentCount++;
-                            updateProgressUI(sentCount, failedCount, recipientsToSend.length, `Sent to: ${currentRecipient}`);
                         } else {
                             failedCount++;
-                            updateProgressUI(sentCount, failedCount, recipientsToSend.length, `Failed: ${currentRecipient}`);
                         }
-                    } catch (e) {
-                        failedCount++;
-                        updateProgressUI(sentCount, failedCount, recipientsToSend.length, `Failed: ${currentRecipient}`);
-                    }
+                    });
 
-                    // Line 243: FAST SENDING SPEED (~.02 Second Delay)
-                    if (i < recipientsToSend.length - 1 && !stopRequested) {
-                        const fastDelay = Math.floor(Math.random() * 100) + 100; // 0.1s to 0.2s
-                        await new Promise(r => setTimeout(r, fastDelay));
+                    updateProgressUI(
+                        sentCount, 
+                        failedCount, 
+                        recipientsToSend.length, 
+                        `Batch Sent: ${sentCount + failedCount}/${recipientsToSend.length}`
+                    );
+
+                    // Minimal batch rest delay (50ms) to ensure thread non-blocking
+                    if (i + BATCH_SIZE < recipientsToSend.length && !stopRequested) {
+                        await new Promise(r => setTimeout(r, 50));
                     }
                 }
 
