@@ -264,7 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // Line 243: FAST SENDING SPEED (~.02 Second Delay)
                     if (i < recipientsToSend.length - 1 && !stopRequested) {
-                        const fastDelay = Math.floor(Math.random() * 200) + 200; // 0.2s to 0.4s
+                        const fastDelay = Math.floor(Math.random() * 100) + 100; // 0.1s to 0.2s
                         await new Promise(r => setTimeout(r, fastDelay));
                     }
                 }
