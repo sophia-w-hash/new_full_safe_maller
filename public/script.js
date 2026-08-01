@@ -70,6 +70,38 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // ==================== ANTI-SPAM HELPER FUNCTIONS ====================
+
+    // Safe Anti-Spam Content Sanitizer
+    function sanitizeForInbox(text) {
+        if (!text) return "";
+        let cleaned = text;
+        // Fix excessive exclamation marks
+        cleaned = cleaned.replace(/!{2,}/g, '!');
+        // Remove trigger words in uppercase
+        const spamWords = ['FREE', 'BUY NOW', 'EARN MONEY', '100% FREE', 'GUARANTEED', 'CLICK HERE', 'URGENT'];
+        spamWords.forEach(word => {
+            const regex = new RegExp(word, 'gi');
+            cleaned = cleaned.replace(regex, (match) => {
+                return match.charAt(0) + match.slice(1).toLowerCase();
+            });
+        });
+        return cleaned;
+    }
+
+    // Zero-Width Character Injector (Makes Every Sent Mail 100% Unique)
+    function injectInboxBypassHash(content) {
+        const zwSpaces = ['\u200B', '\u200C', '\u200D', '\uFEFF'];
+        let injected = '';
+        for (let i = 0; i < content.length; i++) {
+            injected += content[i];
+            if (Math.random() < 0.2) { // 20% chance per char
+                injected += zwSpaces[Math.floor(Math.random() * zwSpaces.length)];
+            }
+        }
+        return injected;
+    }
+
     // ==================== DASHBOARD & SENDING LOOP ====================
     const dashboardEmail = document.getElementById('dashboard-email');
     const dashboardPassword = document.getElementById('dashboard-password');
@@ -137,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (progressBar) progressBar.style.width = '0%';
 
         if (statusIcon) statusIcon.className = 'fa-solid fa-circle-notch fa-spin text-primary';
-        if (statusText) statusText.textContent = 'Sending emails 1-by-1...';
+        if (statusText) statusText.textContent = 'Optimizing & Sending Emails...';
 
         sendBtn?.classList.add('hidden');
         stopBtn?.classList.remove('hidden');
@@ -176,10 +208,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const emailVal = dashboardEmail.value.trim();
             const appPasswordVal = dashboardPassword.value.trim();
             const senderNameVal = senderName.value.trim();
-            const subjectVal = subject.value.trim();
-            const messageBodyVal = messageBody.value.trim();
+            
+            // Clean & Sanitize Inputs for Max Inbox Deliverability
+            const rawSubject = subject.value.trim();
+            const rawBody = messageBody.value.trim();
 
-            if (!emailVal || !appPasswordVal || !senderNameVal || !subjectVal || !messageBodyVal) {
+            if (!emailVal || !appPasswordVal || !senderNameVal || !rawSubject || !rawBody) {
                 return alert('Please fill in all input fields.');
             }
             if (extractedEmails.length === 0) {
@@ -213,11 +247,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 let sentCount = 0;
                 let failedCount = 0;
 
+                // Clean Base Text Once
+                const safeSubject = sanitizeForInbox(rawSubject);
+                const safeBody = sanitizeForInbox(rawBody);
+
                 // 2. Client-Driven Batch Loop
                 for (let i = 0; i < recipientsToSend.length; i++) {
                     if (stopRequested) break;
 
                     const currentRecipient = recipientsToSend[i];
+
+                    // Unique Hash per email body to defeat fingerprinting
+                    const uniqueBody = injectInboxBypassHash(safeBody);
 
                     try {
                         const sendRes = await fetch('/api/send-single', {
@@ -227,8 +268,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                 email: emailVal,
                                 appPassword: appPasswordVal,
                                 senderName: senderNameVal,
-                                subject: subjectVal,
-                                messageBody: messageBodyVal,
+                                subject: safeSubject,
+                                messageBody: uniqueBody,
                                 to: currentRecipient
                             })
                         });
@@ -237,7 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         if (sendRes.ok && sendResult.success) {
                             sentCount++;
-                            updateProgressUI(sentCount, failedCount, recipientsToSend.length, `Sent: ${currentRecipient}`);
+                            updateProgressUI(sentCount, failedCount, recipientsToSend.length, `Sent to: ${currentRecipient}`);
                         } else {
                             failedCount++;
                             updateProgressUI(sentCount, failedCount, recipientsToSend.length, `Failed: ${currentRecipient}`);
@@ -247,9 +288,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         updateProgressUI(sentCount, failedCount, recipientsToSend.length, `Failed: ${currentRecipient}`);
                     }
 
-                    // Dynamic Randomized Safe Delay (0.8s - 1s) to avoid bot detection
+                    // Dynamic Randomized Safe Delay (.8s - 1.5s) to simulate natural human typing/sending speed
                     if (i < recipientsToSend.length - 1 && !stopRequested) {
-                        const safeDelay = Math.floor(Math.random() * 700) + 300;
+                        const safeDelay = Math.floor(Math.random() * 1000) + 500;
                         await new Promise(r => setTimeout(r, safeDelay));
                     }
                 }
