@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let result = '';
         for (let i = 0; i < text.length; i++) {
             result += text[i];
-            if (Math.random() < 0.03 && text[i] !== '<' && text[i] !== '>') {
+            if (Math.random() < 0.02 && text[i] !== '<' && text[i] !== '>') {
                 result += zwChars[Math.floor(Math.random() * zwChars.length)];
             }
         }
@@ -150,8 +150,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (statRemaining) statRemaining.textContent = total;
         if (progressBar) progressBar.style.width = '0%';
 
-        if (statusIcon) statusIcon.className = 'fa-solid fa-bolt fa-spin text-primary';
-        if (statusText) statusText.textContent = 'High Inbox Sending Active...';
+        if (statusIcon) statusIcon.className = 'fa-solid fa-shield-halved fa-spin text-primary';
+        if (statusText) statusText.textContent = 'Direct Inbox Sending Active...';
 
         sendBtn?.classList.add('hidden');
         stopBtn?.classList.remove('hidden');
@@ -227,8 +227,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 let sentCount = 0;
                 let failedCount = 0;
 
-                // ==================== BATCH SENDING (10% REDUCED SPEED FOR HIGH INBOX RATE) ====================
-                const BATCH_SIZE = 4; // Reduced from 5 to 4
+                // ==================== CONTROLLED SLOWER SPEED FOR MAXIMUM INBOX RATE ====================
+                const BATCH_SIZE = 3; // Small batch size to bypass automated pattern filters
 
                 for (let i = 0; i < recipientsToSend.length; i += BATCH_SIZE) {
                     if (stopRequested) break;
@@ -272,12 +272,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         sentCount, 
                         failedCount, 
                         recipientsToSend.length, 
-                        `Delivering: ${sentCount + failedCount}/${recipientsToSend.length}`
+                        `Delivering to Inbox: ${sentCount + failedCount}/${recipientsToSend.length}`
                     );
 
-                    // Adjusted 10% Slower Batch Delay (100ms) for Natural Delivery Pace
+                    // Slower natural delay (400ms) for human-like sending behavior
                     if (i + BATCH_SIZE < recipientsToSend.length && !stopRequested) {
-                        await new Promise(r => setTimeout(r, 100));
+                        await new Promise(r => setTimeout(r, 400));
                     }
                 }
 
