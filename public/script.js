@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    // ==================== AUTHENTICATION & UI ====================
+    // ==================== AUTHENTICATION UI ====================
     const passwordGate = document.getElementById('password-gate');
     const mainApp = document.getElementById('main-app');
     const gateForm = document.getElementById('gate-form');
@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // ==================== MAIN CONSOLE & LIVE MONITOR ====================
+    // ==================== DASHBOARD & SENDING LOOP ====================
     const dashboardEmail = document.getElementById('dashboard-email');
     const dashboardPassword = document.getElementById('dashboard-password');
     const togglePasswordBtn = document.getElementById('toggle-password');
@@ -194,7 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sendBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying...';
 
             try {
-                // 1. Verify Credentials
+                // 1. SMTP Credentials Check
                 const verifyRes = await fetch('/api/verify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -213,7 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 let sentCount = 0;
                 let failedCount = 0;
 
-                // 2. Client-Side Loop (Bypasses Server Timeout Limits)
+                // 2. Client-Driven Batch Loop (Bypasses Vercel/Cloudflare 10s Timeouts)
                 for (let i = 0; i < recipientsToSend.length; i++) {
                     if (stopRequested) break;
 
@@ -247,9 +247,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         updateProgressUI(sentCount, failedCount, recipientsToSend.length, `Failed: ${currentRecipient}`);
                     }
 
-                    // 500ms delay for Gmail Safety & Inbox Placement
+                    // 500ms safety delay (Line 243)
                     if (i < recipientsToSend.length - 1 && !stopRequested) {
-                        await new Promise(r => setTimeout(r, 250));
+                        await new Promise(r => setTimeout(r, 500));
                     }
                 }
 
