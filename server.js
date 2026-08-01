@@ -28,7 +28,7 @@ app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-// Transporter Cache Pool
+// Transporter Cache Pool - Optimized for High Inbox Rate
 const transporterCache = new Map();
 
 function getSafeTransporter(email, appPassword) {
@@ -40,13 +40,13 @@ function getSafeTransporter(email, appPassword) {
       service: "gmail",
       auth: { user: cleanEmail, pass: appPassword },
       pool: true,
-      maxConnections: 15,
+      maxConnections: 8, // Smooth connection count for primary delivery
       maxMessages: Infinity,
       rateDelta: 1000,
-      rateLimit: 20,
-      connectionTimeout: 8000,
-      greetingTimeout: 4000,
-      socketTimeout: 10000
+      rateLimit: 12, // Controlled sending rate for high domain reputation
+      connectionTimeout: 10000,
+      greetingTimeout: 5000,
+      socketTimeout: 12000
     });
     transporterCache.set(cacheKey, transporter);
   }
@@ -70,7 +70,7 @@ function parseSpintax(text) {
   return spun;
 }
 
-// HTML to Clean Plain Text
+// Convert HTML to Clean Plain Text
 function convertHtmlToText(html) {
   if (!html) return "";
   return html
@@ -126,7 +126,7 @@ app.post("/api/send-single", async (req, res) => {
     const spunBody = parseSpintax(messageBody);
     const isHtml = /<[a-z][\s\S]*>/i.test(spunBody);
 
-    // Natural Message-ID Generation for Direct Inbox Placement
+    // Dynamic Natural Message-ID for Direct Inbox Placement
     const randomHex = crypto.randomBytes(6).toString('hex');
     const domain = senderEmail.split('@')[1] || 'gmail.com';
     const customMessageId = `<${Date.now()}.${randomHex}@${domain}>`;
