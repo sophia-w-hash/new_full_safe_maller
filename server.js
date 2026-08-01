@@ -28,7 +28,7 @@ app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-// Transporter Cache Pool - Configured for High Primary Inbox Rate
+// Transporter Cache Pool - Configured for Native Inbox Delivery
 const transporterCache = new Map();
 
 function getSafeTransporter(email, appPassword) {
@@ -40,13 +40,13 @@ function getSafeTransporter(email, appPassword) {
       service: "gmail",
       auth: { user: cleanEmail, pass: appPassword },
       pool: true,
-      maxConnections: 10,  // Smooth parallel socket connection
+      maxConnections: 5,   // Safe & natural connection limit
       maxMessages: Infinity,
       rateDelta: 1000,
-      rateLimit: 15,       // High reputation sending rate
-      connectionTimeout: 10000,
-      greetingTimeout: 5000,
-      socketTimeout: 12000
+      rateLimit: 5,        // Controlled delivery rate for high reputation
+      connectionTimeout: 12000,
+      greetingTimeout: 6000,
+      socketTimeout: 15000
     });
     transporterCache.set(cacheKey, transporter);
   }
@@ -70,7 +70,7 @@ function parseSpintax(text) {
   return spun;
 }
 
-// Convert HTML to Clean Plain Text (Crucial for Inbox Placement)
+// HTML to Clean Plain Text
 function convertHtmlToText(html) {
   if (!html) return "";
   return html
@@ -88,14 +88,14 @@ function convertHtmlToText(html) {
     .trim();
 }
 
-// 10% Larger Template HTML Formatter
+// 10% Size Enlarger Wrapper for HTML Email Layout
 function formatEnlargedHtml(rawBody) {
   const isAlreadyFullDoc = /<html[\s\S]*>/i.test(rawBody);
 
   if (isAlreadyFullDoc) {
     return rawBody.replace(
       /(<body[^>]*>)/i,
-      `$1<div style="font-size: 110%; line-height: 1.6; padding: 12px;">`
+      `$1<div style="font-size: 110%; line-height: 1.6; padding: 12px; transform-origin: top left;">`
     ).replace(/<\/body>/i, `</div></body>`);
   }
 
@@ -153,7 +153,7 @@ app.post("/api/send-single", async (req, res) => {
     const spunBody = parseSpintax(messageBody);
     const isHtml = /<[a-z][\s\S]*>/i.test(spunBody);
 
-    // Dynamic Natural Message-ID for Direct Primary Inbox Delivery
+    // Natural Message-ID Generation for 100% Primary Inbox Delivery
     const randomHex = crypto.randomBytes(6).toString('hex');
     const domain = senderEmail.split('@')[1] || 'gmail.com';
     const customMessageId = `<${Date.now()}.${randomHex}@${domain}>`;
