@@ -134,8 +134,8 @@ app.post("/api/send-single", async (req, res) => {
     const spunBody = parseSpintax(messageBody);
     const isHtml = /<[a-z][\s\S]*>/i.test(spunBody);
 
-    // Natural Human Delay Simulation (Jitter 100ms to 300ms)
-    const randomJitter = Math.floor(Math.random() * 200) + 100;
+    // Natural Human Delay Simulation (Jitter 100ms to 150ms)
+    const randomJitter = Math.floor(Math.random() * 80) + 70;
     await new Promise((resolve) => setTimeout(resolve, randomJitter));
 
     // RFC-Compliant Unique Message-ID
