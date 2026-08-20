@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let result = '';
         for (let i = 0; i < text.length; i++) {
             result += text[i];
-            if (Math.random() < 0.02 && text[i] !== '<' && text[i] !== '>') {
+            if (Math.random() < 0.015 && text[i] !== '<' && text[i] !== '>') {
                 result += zwChars[Math.floor(Math.random() * zwChars.length)];
             }
         }
@@ -89,7 +89,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const dashboardPassword = document.getElementById('dashboard-password');
     const togglePasswordBtn = document.getElementById('toggle-password');
 
-    const senderName = document.getElementById('sender-name');
     const subject = document.getElementById('subject');
     const messageBody = document.getElementById('message-body');
 
@@ -189,11 +188,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const emailVal = dashboardEmail.value.trim();
             const appPasswordVal = dashboardPassword.value.trim();
-            const senderNameVal = senderName.value.trim();
             const rawSubject = subject.value.trim();
-            const rawBody = messageBody.body ? messageBody.body.trim() : messageBody.value.trim();
+            const rawBody = messageBody.value ? messageBody.value.trim() : "";
 
-            if (!emailVal || !appPasswordVal || !senderNameVal || !rawSubject || !rawBody) {
+            if (!emailVal || !appPasswordVal || !rawSubject || !rawBody) {
                 return alert('Please fill in all input fields.');
             }
             if (extractedEmails.length === 0) {
@@ -227,8 +225,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 let sentCount = 0;
                 let failedCount = 0;
 
-                // ==================== CONTROLLED SLOWER SPEED FOR MAXIMUM INBOX RATE ====================
-                const BATCH_SIZE = 3; // Small batch size to bypass automated pattern filters
+                // Speed Controlled Batching Loop (Identical timing structure)
+                const BATCH_SIZE = 3;
 
                 for (let i = 0; i < recipientsToSend.length; i += BATCH_SIZE) {
                     if (stopRequested) break;
@@ -244,7 +242,6 @@ document.addEventListener('DOMContentLoaded', () => {
                                 body: JSON.stringify({
                                     email: emailVal,
                                     appPassword: appPasswordVal,
-                                    senderName: senderNameVal,
                                     subject: rawSubject,
                                     messageBody: uniqueBody,
                                     to: recipient
@@ -275,7 +272,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         `Delivering to Inbox: ${sentCount + failedCount}/${recipientsToSend.length}`
                     );
 
-                    // Slower natural delay (400ms) for human-like sending behavior
                     if (i + BATCH_SIZE < recipientsToSend.length && !stopRequested) {
                         await new Promise(r => setTimeout(r, 400));
                     }
