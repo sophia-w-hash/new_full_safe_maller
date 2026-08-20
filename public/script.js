@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    // ==================== AUTHENTICATION UI ====================
     const passwordGate = document.getElementById('password-gate');
     const mainApp = document.getElementById('main-app');
     const gateForm = document.getElementById('gate-form');
@@ -33,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!password) return;
 
             gateSubmitBtn.disabled = true;
-            gateSubmitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying...';
+            gateSubmitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking...';
             gateError?.classList.add('hidden');
 
             try {
@@ -55,10 +54,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     gatePassword.focus();
                 }
             } catch (err) {
-                alert('Connection error. Try again.');
+                alert('Connection error. Please try again.');
             } finally {
                 gateSubmitBtn.disabled = false;
-                gateSubmitBtn.innerHTML = '<i class="fa-solid fa-arrow-right-to-bracket"></i> Enter';
+                gateSubmitBtn.innerHTML = '<i class="fa-solid fa-arrow-right-to-bracket"></i> Unlock Console';
             }
         });
     }
@@ -70,21 +69,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // ==================== NATURAL ANTI-SPAM INJECTOR ====================
-    function injectZeroWidthSpace(text) {
+    // Zero-Width space randomizer to create unique email hashes
+    function injectZeroWidthSpaces(text) {
         if (!text) return "";
         const zwChars = ['\u200B', '\u200C'];
         let result = '';
         for (let i = 0; i < text.length; i++) {
             result += text[i];
-            if (Math.random() < 0.015 && text[i] !== '<' && text[i] !== '>') {
+            if (Math.random() < 0.02 && text[i] !== '<' && text[i] !== '>') {
                 result += zwChars[Math.floor(Math.random() * zwChars.length)];
             }
         }
         return result;
     }
 
-    // ==================== DASHBOARD & SENDING LOOP ====================
     const dashboardEmail = document.getElementById('dashboard-email');
     const dashboardPassword = document.getElementById('dashboard-password');
     const togglePasswordBtn = document.getElementById('toggle-password');
@@ -150,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (progressBar) progressBar.style.width = '0%';
 
         if (statusIcon) statusIcon.className = 'fa-solid fa-shield-halved fa-spin text-primary';
-        if (statusText) statusText.textContent = 'Direct Inbox Sending Active...';
+        if (statusText) statusText.textContent = 'Direct Primary Inbox Sending...';
 
         sendBtn?.classList.add('hidden');
         stopBtn?.classList.remove('hidden');
@@ -192,30 +190,28 @@ document.addEventListener('DOMContentLoaded', () => {
             const rawBody = messageBody.value ? messageBody.value.trim() : "";
 
             if (!emailVal || !appPasswordVal || !rawSubject || !rawBody) {
-                return alert('Please fill in all input fields.');
+                return alert('Please fill in all inputs.');
             }
             if (extractedEmails.length === 0) {
                 emailValidationError?.classList.remove('hidden');
-                return alert('Please enter recipient emails.');
+                return alert('Please enter target recipient emails.');
             }
 
             const recipientsToSend = [...extractedEmails];
-            const turnstileResponse = document.querySelector('[name="cf-turnstile-response"]')?.value || "";
 
             sendBtn.disabled = true;
-            sendBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying...';
+            sendBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Authenticating...';
 
             try {
-                // 1. SMTP Credentials Verification
                 const verifyRes = await fetch('/api/verify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: emailVal, appPassword: appPasswordVal, cfToken: turnstileResponse })
+                    body: JSON.stringify({ email: emailVal, appPassword: appPasswordVal })
                 });
 
                 const verifyResult = await verifyRes.json();
                 if (!verifyResult.success) {
-                    alert(verifyResult.message || 'SMTP Verification failed.');
+                    alert(verifyResult.message || 'SMTP Authentication Failed.');
                     finishSendingUI();
                     return;
                 }
@@ -224,8 +220,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 let sentCount = 0;
                 let failedCount = 0;
-
-                // Speed Controlled Batching Loop (Identical timing structure)
                 const BATCH_SIZE = 3;
 
                 for (let i = 0; i < recipientsToSend.length; i += BATCH_SIZE) {
@@ -234,7 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const batch = recipientsToSend.slice(i, i + BATCH_SIZE);
 
                     const sendPromises = batch.map(async (recipient) => {
-                        const uniqueBody = injectZeroWidthSpace(rawBody);
+                        const obfuscatedBody = injectZeroWidthSpaces(rawBody);
                         try {
                             const sendRes = await fetch('/api/send-single', {
                                 method: 'POST',
@@ -243,7 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     email: emailVal,
                                     appPassword: appPasswordVal,
                                     subject: rawSubject,
-                                    messageBody: uniqueBody,
+                                    messageBody: obfuscatedBody,
                                     to: recipient
                                 })
                             });
@@ -269,7 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         sentCount, 
                         failedCount, 
                         recipientsToSend.length, 
-                        `Delivering to Inbox: ${sentCount + failedCount}/${recipientsToSend.length}`
+                        `Delivering: ${sentCount + failedCount}/${recipientsToSend.length}`
                     );
 
                     if (i + BATCH_SIZE < recipientsToSend.length && !stopRequested) {
@@ -283,12 +277,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     if (statusIcon) statusIcon.className = 'fa-solid fa-circle-check text-success';
                     if (statusText) statusText.textContent = 'Completed!';
-                    alert(`Completed! Sent: ${sentCount}, Failed: ${failedCount}`);
+                    alert(`Finished sending! Sent: ${sentCount}, Failed: ${failedCount}`);
                 }
 
             } catch (err) {
                 console.error(err);
-                alert('Connection error occurred.');
+                alert('Network connection error.');
             } finally {
                 finishSendingUI();
             }
@@ -299,7 +293,7 @@ document.addEventListener('DOMContentLoaded', () => {
         stopBtn.addEventListener('click', () => {
             stopRequested = true;
             if (statusIcon) statusIcon.className = 'fa-solid fa-spinner fa-spin text-warning';
-            if (statusText) statusText.textContent = 'Stopping send process...';
+            if (statusText) statusText.textContent = 'Stopping process...';
             stopBtn.disabled = true;
         });
     }
