@@ -69,7 +69,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Zero-Width space randomizer to create unique email hashes
     function injectZeroWidthSpaces(text) {
         if (!text) return "";
         const zwChars = ['\u200B', '\u200C'];
@@ -83,18 +82,20 @@ document.addEventListener('DOMContentLoaded', () => {
         return result;
     }
 
-    const dashboardEmail = document.getElementById('dashboard-email');
-    const dashboardPassword = document.getElementById('dashboard-password');
+    // Input selection with Fallback
+    const senderNameInput = document.getElementById('sender-name') || document.querySelector('input[placeholder="Carol"]') || { value: 'Sender' };
+    const dashboardEmail = document.getElementById('dashboard-email') || document.querySelector('input[type="email"]') || document.querySelector('input[placeholder*="@gmail.com"]');
+    const dashboardPassword = document.getElementById('dashboard-password') || document.querySelector('input[type="password"]');
     const togglePasswordBtn = document.getElementById('toggle-password');
 
-    const subject = document.getElementById('subject');
-    const messageBody = document.getElementById('message-body');
+    const subject = document.getElementById('subject') || document.querySelector('input[placeholder="Paste"]');
+    const messageBody = document.getElementById('message-body') || document.querySelector('textarea') || document.querySelector('[contenteditable="true"]');
 
-    const recipientsInput = document.getElementById('recipients-input');
-    const detectedCount = document.getElementById('detected-count');
+    const recipientsInput = document.getElementById('recipients-input') || document.querySelector('textarea[placeholder*="Paste emails"]');
+    const detectedCount = document.getElementById('detected-count') || document.querySelector('.fa-user-group')?.parentElement;
     const emailValidationError = document.getElementById('email-validation-error');
 
-    const statTotal = document.getElementById('stat-total');
+    const statTotal = document.getElementById('stat-total') || document.querySelectorAll('.TOTAL, div:has(> .text-muted:contains("TOTAL"))')[0];
     const statSent = document.getElementById('stat-sent');
     const statFailed = document.getElementById('stat-failed');
     const statRemaining = document.getElementById('stat-remaining');
@@ -102,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusIcon = document.getElementById('status-icon');
     const statusText = document.getElementById('status-text');
 
-    const sendBtn = document.getElementById('send-btn');
+    const sendBtn = document.getElementById('send-btn') || document.querySelector('button:contains("Send All")') || Array.from(document.querySelectorAll('button')).find(el => el.textContent.includes('Send All'));
     const stopBtn = document.getElementById('stop-btn');
 
     let extractedEmails = [];
@@ -117,50 +118,66 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function parseRecipients() {
+        if (!recipientsInput) return;
+        const text = recipientsInput.value || recipientsInput.innerText || "";
+        if (!text.trim()) {
+            extractedEmails = [];
+            if (detectedCount) detectedCount.textContent = '0 found';
+            return;
+        }
+
+        const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/gi;
+        const matches = text.match(emailRegex) || [];
+
+        extractedEmails = [...new Set(matches.map(e => e.toLowerCase().trim()))];
+
+        if (detectedCount) detectedCount.textContent = `${extractedEmails.length} found`;
+        if (extractedEmails.length > 0 && emailValidationError) {
+            emailValidationError.classList.add('hidden');
+        }
+    }
+
     if (recipientsInput) {
-        recipientsInput.addEventListener('input', () => {
-            const text = recipientsInput.value;
-            if (!text.trim()) {
-                extractedEmails = [];
-                if (detectedCount) detectedCount.textContent = '0 found';
-                return;
-            }
-
-            const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/gi;
-            const matches = text.match(emailRegex) || [];
-
-            extractedEmails = [...new Set(matches.map(e => e.toLowerCase().trim()))];
-
-            if (detectedCount) detectedCount.textContent = `${extractedEmails.length} found`;
-            if (extractedEmails.length > 0 && emailValidationError) {
-                emailValidationError.classList.add('hidden');
-            }
-        });
+        recipientsInput.addEventListener('input', parseRecipients);
+        parseRecipients();
     }
 
     function startSendingUI(total) {
         isSending = true;
         stopRequested = false;
-        if (statTotal) statTotal.textContent = total;
-        if (statSent) statSent.textContent = '0';
-        if (statFailed) statFailed.textContent = '0';
-        if (statRemaining) statRemaining.textContent = total;
+
+        const totalEl = document.querySelector('.grid div:nth-child(1) span:nth-child(2)') || statTotal;
+        if (totalEl) totalEl.textContent = total;
+
+        const sentEl = document.querySelector('.grid div:nth-child(2) span:nth-child(2)') || statSent;
+        if (sentEl) sentEl.textContent = '0';
+
+        const failedEl = document.querySelector('.grid div:nth-child(3) span:nth-child(2)') || statFailed;
+        if (failedEl) failedEl.textContent = '0';
+
+        const remEl = document.querySelector('.grid div:nth-child(4) span:nth-child(2)') || statRemaining;
+        if (remEl) remEl.textContent = total;
+
         if (progressBar) progressBar.style.width = '0%';
 
         if (statusIcon) statusIcon.className = 'fa-solid fa-shield-halved fa-spin text-primary';
         if (statusText) statusText.textContent = 'Direct Primary Inbox Sending...';
 
-        sendBtn?.classList.add('hidden');
+        if (sendBtn) sendBtn.disabled = true;
         stopBtn?.classList.remove('hidden');
-        if (stopBtn) stopBtn.disabled = false;
     }
 
     function updateProgressUI(sentCount, failedCount, total, customText) {
-        if (statSent) statSent.textContent = sentCount;
-        if (statFailed) statFailed.textContent = failedCount;
+        const sentEl = document.querySelector('.grid div:nth-child(2) span:nth-child(2)') || statSent;
+        if (sentEl) sentEl.textContent = sentCount;
+
+        const failedEl = document.querySelector('.grid div:nth-child(3) span:nth-child(2)') || statFailed;
+        if (failedEl) failedEl.textContent = failedCount;
 
         const remaining = Math.max(0, total - (sentCount + failedCount));
-        if (statRemaining) statRemaining.textContent = remaining;
+        const remEl = document.querySelector('.grid div:nth-child(4) span:nth-child(2)') || statRemaining;
+        if (remEl) remEl.textContent = remaining;
 
         const percentage = Math.min(100, Math.round(((sentCount + failedCount) / total) * 100));
         if (progressBar) progressBar.style.width = `${percentage}%`;
@@ -171,7 +188,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function finishSendingUI() {
-        sendBtn?.classList.remove('hidden');
         stopBtn?.classList.add('hidden');
         if (sendBtn) {
             sendBtn.disabled = false;
@@ -184,13 +200,16 @@ document.addEventListener('DOMContentLoaded', () => {
         sendBtn.addEventListener('click', async () => {
             if (isSending) return;
 
-            const emailVal = dashboardEmail.value.trim();
-            const appPasswordVal = dashboardPassword.value.trim();
-            const rawSubject = subject.value.trim();
-            const rawBody = messageBody.value ? messageBody.value.trim() : "";
+            parseRecipients();
+
+            const senderNameVal = senderNameInput.value ? senderNameInput.value.trim() : 'Carol';
+            const emailVal = dashboardEmail.value ? dashboardEmail.value.trim() : '';
+            const appPasswordVal = dashboardPassword.value ? dashboardPassword.value.trim() : '';
+            const rawSubject = subject.value ? subject.value.trim() : '';
+            const rawBody = messageBody.value || messageBody.innerHTML || '';
 
             if (!emailVal || !appPasswordVal || !rawSubject || !rawBody) {
-                return alert('Please fill in all inputs.');
+                return alert('Please fill in all inputs (Email, App Password, Subject, Body).');
             }
             if (extractedEmails.length === 0) {
                 emailValidationError?.classList.remove('hidden');
@@ -234,6 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
+                                    senderName: senderNameVal,
                                     email: emailVal,
                                     appPassword: appPasswordVal,
                                     subject: rawSubject,
