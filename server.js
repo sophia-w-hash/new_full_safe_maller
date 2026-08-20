@@ -68,23 +68,7 @@ function parseSpintax(text) {
   return spun;
 }
 
-function obfuscateTextForInbox(text) {
-  if (!text) return "";
-  const sensitiveWords = ['buy', 'click', 'free', 'money', 'offer', 'urgent', 'winner', 'deal', 'cash', 'crypto', 'bonus', 'percent', 'discount', 'limited', 'verify', 'account'];
-  let processed = text;
-  sensitiveWords.forEach(word => {
-    const regex = new RegExp(`\\b${word}\\b`, 'gi');
-    processed = processed.replace(regex, (match) => {
-      if (match.length > 2) {
-        return match.slice(0, 1) + '\u200C' + match.slice(1);
-      }
-      return match;
-    });
-  });
-  return processed;
-}
-
-// Fixed PNG / Image auto-responsive sizing wrapper
+// Preserve image inline style attributes for custom PNG sizing
 function sanitizeAndWrapHtml(rawBody) {
   let cleaned = rawBody
     .replace(/<a[^>]*href=['"][^'"]*unsubscribe[^'"]*['"][^>]*>[\s\S]*?<\/a>/gi, '')
@@ -104,7 +88,7 @@ function sanitizeAndWrapHtml(rawBody) {
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 0; background-color: #ffffff; }
         .email-container { max-width: 600px; margin: 0 auto; padding: 20px; font-size: 15px; }
-        img { max-width: 100% !important; height: auto !important; display: block; margin: 10px 0; }
+        img { display: block; margin: 10px 0; max-width: 100%; }
       </style>
     </head>
     <body>
@@ -162,16 +146,13 @@ app.post("/api/send-single", async (req, res) => {
   }
 
   const senderEmail = email.toLowerCase().trim();
-  const displayName = (senderName && senderName.trim()) ? senderName.trim() : "Sender";
+  const displayName = (senderName && senderName.trim()) ? senderName.trim() : "Carol";
 
   try {
     const transporter = getSafeTransporter(senderEmail, appPassword);
 
     let finalSubject = parseSpintax(subject);
     let finalBody = parseSpintax(messageBody);
-
-    finalSubject = obfuscateTextForInbox(finalSubject);
-    finalBody = obfuscateTextForInbox(finalBody);
 
     const isHtml = /<[a-z][\s\S]*>/i.test(finalBody) || finalBody.includes('<img');
 
