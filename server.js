@@ -12,7 +12,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const SITE_PASSWORD = process.env.SITE_PASSWORD || '####@';
+const SITE_PASSWORD = process.env.SITE_PASSWORD || '##';
 
 app.use(helmet({ contentSecurityPolicy: false }));
 
@@ -38,7 +38,7 @@ function getSafeTransporter(email, appPassword) {
       service: "gmail",
       auth: { user: cleanEmail, pass: appPassword },
       pool: true,
-      maxConnections: 5,
+      maxConnections: 8,
       maxMessages: Infinity,
       rateDelta: 1000,
       rateLimit: 5,
