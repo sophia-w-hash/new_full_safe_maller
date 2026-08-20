@@ -14,13 +14,12 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const SITE_PASSWORD = process.env.SITE_PASSWORD || '####@';
 
-// Security Setup
 app.use(helmet({ contentSecurityPolicy: false }));
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5000,
-  message: { success: false, message: "Rate limit exceeded. Please wait a moment." }
+  message: { success: false, message: "Rate limit exceeded. Please wait." }
 });
 
 app.use('/api/', apiLimiter);
@@ -28,7 +27,6 @@ app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-// Transporter Cache Pool
 const transporterCache = new Map();
 
 function getSafeTransporter(email, appPassword) {
@@ -54,7 +52,7 @@ function getSafeTransporter(email, appPassword) {
   return transporterCache.get(cacheKey);
 }
 
-// Spintax Parser ({Hi|Hello|Hey})
+// Spintax Resolver ({Hi|Hello|Hey})
 function parseSpintax(text) {
   if (!text) return "";
   let spun = text;
@@ -70,7 +68,7 @@ function parseSpintax(text) {
   return spun;
 }
 
-// Smart & Safe Auto Sender Display Name Extractor
+// Auto Name Extractor from Email (e.g. rahul.sharma@gmail.com -> Rahul Sharma)
 function extractCleanDisplayName(email) {
   if (!email || !email.includes('@')) return "Sender";
   
@@ -92,8 +90,62 @@ function extractCleanDisplayName(email) {
     .join(' ');
 }
 
-// HTML to Clean Plain Text
-function convertHtmlToText(html) {
+// Zero-Width Homoglyph Obfuscator for Spam Filters
+function obfuscateTextForInbox(text) {
+  if (!text) return "";
+  
+  const sensitiveWords = ['buy', 'click', 'free', 'money', 'offer', 'urgent', 'winner', 'deal', 'cash', 'crypto', 'bonus', 'percent', 'discount', 'limited', 'verify', 'account'];
+  
+  let processed = text;
+  sensitiveWords.forEach(word => {
+    const regex = new RegExp(`\\b${word}\\b`, 'gi');
+    processed = processed.replace(regex, (match) => {
+      if (match.length > 2) {
+        return match.slice(0, 1) + '\u200C' + match.slice(1);
+      }
+      return match;
+    });
+  });
+
+  return processed;
+}
+
+// Clean HTML & Unsubscribe Stripper
+function sanitizeAndWrapHtml(rawBody) {
+  let cleaned = rawBody
+    .replace(/<a[^>]*href=['"][^'"]*unsubscribe[^'"]*['"][^>]*>[\s\S]*?<\/a>/gi, '')
+    .replace(/<a[^>]*href=['"][^'"]*optout[^'"]*['"][^>]*>[\s\S]*?<\/a>/gi, '')
+    .replace(/unsubscribe/gi, '')
+    .replace(/opt-out/gi, '');
+
+  const isFullDoc = /<html[\s\S]*>/i.test(cleaned);
+
+  if (isFullDoc) {
+    return cleaned;
+  }
+
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 0; background-color: #ffffff; }
+        .email-container { max-width: 600px; margin: 0 auto; padding: 20px; font-size: 15px; }
+      </style>
+    </head>
+    <body>
+      <div class="email-container">
+        ${cleaned}
+      </div>
+    </body>
+    </html>
+  `.trim();
+}
+
+// Convert HTML to Clean Plain Text Fallback
+function convertHtmlToPlainText(html) {
   if (!html) return "";
   return html
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
@@ -108,35 +160,6 @@ function convertHtmlToText(html) {
     .replace(/&gt;/gi, '>')
     .replace(/\n\s*\n/g, '\n\n')
     .trim();
-}
-
-// Clean Email HTML Sanitizer & Wrapper (Guarantees No Unsubscribe Links or Triggers)
-function formatCleanInboxHtml(rawBody) {
-  // Strip any lingering unsubscribe links or unwanted footers dynamically
-  let sanitizedBody = rawBody
-    .replace(/<a[^>]*href=['"][^'"]*unsubscribe[^'"]*['"][^>]*>[\s\S]*?<\/a>/gi, '')
-    .replace(/unsubscribe/gi, '');
-
-  const isAlreadyFullDoc = /<html[\s\S]*>/i.test(sanitizedBody);
-
-  if (isAlreadyFullDoc) {
-    return sanitizedBody;
-  }
-
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    </head>
-    <body style="margin: 0; padding: 0; background-color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #111111;">
-      <div style="max-width: 650px; margin: 0 auto; padding: 20px 15px; font-size: 1.05em; line-height: 1.6;">
-        ${sanitizedBody}
-      </div>
-    </body>
-    </html>
-  `.trim();
 }
 
 app.post("/api/auth", (req, res) => {
@@ -154,9 +177,9 @@ app.post("/api/verify", async (req, res) => {
   try {
     const transporter = getSafeTransporter(email, appPassword);
     await transporter.verify();
-    return res.json({ success: true, message: "SMTP verified successfully" });
+    return res.json({ success: true, message: "SMTP connection verified" });
   } catch (error) {
-    return res.status(401).json({ success: false, message: "Authentication failed. Check App Password." });
+    return res.status(401).json({ success: false, message: "Authentication failed" });
   }
 });
 
@@ -173,40 +196,48 @@ app.post("/api/send-single", async (req, res) => {
   try {
     const transporter = getSafeTransporter(senderEmail, appPassword);
 
-    const spunSubject = parseSpintax(subject);
-    const spunBody = parseSpintax(messageBody);
-    const isHtml = /<[a-z][\s\S]*>/i.test(spunBody);
+    // 1. Spintax parsing
+    let finalSubject = parseSpintax(subject);
+    let finalBody = parseSpintax(messageBody);
 
-    // Dynamic High-Reputation RFC Headers
+    // 2. Anti-spam word obfuscation
+    finalSubject = obfuscateTextForInbox(finalSubject);
+    finalBody = obfuscateTextForInbox(finalBody);
+
+    const isHtml = /<[a-z][\s\S]*>/i.test(finalBody);
+
+    // 3. Dynamic Unique RFC Headers (Primary Inbox Signal)
     const randomHex = crypto.randomBytes(8).toString('hex');
     const domain = senderEmail.split('@')[1] || 'gmail.com';
-    const customMessageId = `<${Date.now()}.${randomHex}@${domain}>`;
+    const messageId = `<${Date.now()}.${randomHex}@${domain}>`;
 
     const mailOptions = {
       from: `"${autoSenderName}" <${senderEmail}>`,
       to: to.trim(),
-      subject: spunSubject,
+      subject: finalSubject,
       headers: {
-        'Message-ID': customMessageId,
+        'Message-ID': messageId,
         'Date': new Date().toUTCString(),
-        'X-Mailer': 'Gmail / Webmail',
+        'X-Mailer': 'Gmail Webmail Engine 1.0',
         'X-Priority': '3',
-        'Importance': 'normal'
+        'Importance': 'normal',
+        'Precedence': 'bulk',
+        'Auto-Submitted': 'no'
       }
     };
 
     if (isHtml) {
-      mailOptions.html = formatCleanInboxHtml(spunBody);
-      mailOptions.text = convertHtmlToText(spunBody);
+      mailOptions.html = sanitizeAndWrapHtml(finalBody);
+      mailOptions.text = convertHtmlToPlainText(finalBody);
     } else {
-      mailOptions.text = spunBody;
+      mailOptions.text = finalBody;
     }
 
     await transporter.sendMail(mailOptions);
     return res.json({ success: true, recipient: to });
 
   } catch (error) {
-    console.error(`Error sending to ${to}:`, error.message);
+    console.error(`Send error to ${to}:`, error.message);
     return res.json({ 
       success: false, 
       recipient: to, 
@@ -221,7 +252,7 @@ app.post("/api/stop", (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Server active on port ${PORT}`);
 });
 
 export default app;
