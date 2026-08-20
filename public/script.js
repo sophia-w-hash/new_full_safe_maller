@@ -69,33 +69,87 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function injectZeroWidthSpaces(text) {
-        if (!text) return "";
-        const zwChars = ['\u200B', '\u200C'];
-        let result = '';
-        for (let i = 0; i < text.length; i++) {
-            result += text[i];
-            if (Math.random() < 0.02 && text[i] !== '<' && text[i] !== '>') {
-                result += zwChars[Math.floor(Math.random() * zwChars.length)];
-            }
-        }
-        return result;
-    }
-
-    // Input selection with Fallback
-    const senderNameInput = document.getElementById('sender-name') || document.querySelector('input[placeholder="Carol"]') || { value: 'Sender' };
-    const dashboardEmail = document.getElementById('dashboard-email') || document.querySelector('input[type="email"]') || document.querySelector('input[placeholder*="@gmail.com"]');
+    // Input selection
+    const senderNameInput = document.getElementById('sender-name') || document.querySelector('input[placeholder="Carol"]') || { value: 'Carol' };
+    const dashboardEmail = document.getElementById('dashboard-email') || document.querySelector('input[type="email"]');
     const dashboardPassword = document.getElementById('dashboard-password') || document.querySelector('input[type="password"]');
     const togglePasswordBtn = document.getElementById('toggle-password');
 
     const subject = document.getElementById('subject') || document.querySelector('input[placeholder="Paste"]');
-    const messageBody = document.getElementById('message-body') || document.querySelector('textarea') || document.querySelector('[contenteditable="true"]');
+    let messageBody = document.getElementById('message-body');
+
+    // Upgrade Textarea to Rich-Text Container for Resizable PNG Support
+    if (messageBody && messageBody.tagName === 'TEXTAREA') {
+        const divEditor = document.createElement('div');
+        divEditor.id = 'message-body';
+        divEditor.contentEditable = "true";
+        divEditor.className = messageBody.className;
+        divEditor.style.cssText = "min-height: 180px; max-height: 350px; overflow-y: auto; border: 1px solid #d1d5db; border-radius: 8px; padding: 10px; background: #fff; outline: none;";
+        divEditor.innerHTML = messageBody.value || "Hey! Your site has an attractive appearance but isn't visible among the main sections. May I share the quote?";
+        messageBody.parentNode.replaceChild(divEditor, messageBody);
+        messageBody = divEditor;
+    }
+
+    // Image Resize Toolbar Injector
+    let currentSelectedImg = null;
+    const resizeControls = document.createElement('div');
+    resizeControls.className = 'image-resize-bar hidden';
+    resizeControls.style.cssText = 'position: absolute; z-index: 99; background: #1f2937; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; display: flex; gap: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);';
+    resizeControls.innerHTML = `
+        <span style="align-self: center; font-weight: bold; margin-right: 4px;">PNG Size:</span>
+        <button type="button" data-size="25%" style="background: #374151; color: white; border: none; padding: 2px 6px; border-radius: 4px; cursor: pointer;">Small (25%)</button>
+        <button type="button" data-size="50%" style="background: #374151; color: white; border: none; padding: 2px 6px; border-radius: 4px; cursor: pointer;">Medium (50%)</button>
+        <button type="button" data-size="75%" style="background: #374151; color: white; border: none; padding: 2px 6px; border-radius: 4px; cursor: pointer;">Large (75%)</button>
+        <button type="button" data-size="100%" style="background: #374151; color: white; border: none; padding: 2px 6px; border-radius: 4px; cursor: pointer;">Full (100%)</button>
+    `;
+    document.body.appendChild(resizeControls);
+
+    if (messageBody) {
+        // Auto default small sizing on pasted PNG images
+        messageBody.addEventListener('paste', (e) => {
+            setTimeout(() => {
+                const imgs = messageBody.querySelectorAll('img');
+                imgs.forEach(img => {
+                    if (!img.style.width) {
+                        img.style.width = '30%'; // Default small size
+                        img.style.height = 'auto';
+                        img.style.display = 'block';
+                        img.style.margin = '10px 0';
+                        img.style.cursor = 'pointer';
+                    }
+                });
+            }, 100);
+        });
+
+        // Click on PNG image inside editor to show resize toolbar
+        messageBody.addEventListener('click', (e) => {
+            if (e.target.tagName === 'IMG') {
+                currentSelectedImg = e.target;
+                const rect = currentSelectedImg.getBoundingClientRect();
+                resizeControls.style.top = `${window.scrollY + rect.top - 35}px`;
+                resizeControls.style.left = `${window.scrollX + rect.left}px`;
+                resizeControls.classList.remove('hidden');
+            } else {
+                resizeControls.classList.add('hidden');
+                currentSelectedImg = null;
+            }
+        });
+    }
+
+    resizeControls.addEventListener('click', (e) => {
+        if (e.target.tagName === 'BUTTON' && currentSelectedImg) {
+            const size = e.target.getAttribute('data-size');
+            currentSelectedImg.style.width = size;
+            currentSelectedImg.style.height = 'auto';
+            resizeControls.classList.add('hidden');
+        }
+    });
 
     const recipientsInput = document.getElementById('recipients-input') || document.querySelector('textarea[placeholder*="Paste emails"]');
     const detectedCount = document.getElementById('detected-count') || document.querySelector('.fa-user-group')?.parentElement;
     const emailValidationError = document.getElementById('email-validation-error');
 
-    const statTotal = document.getElementById('stat-total') || document.querySelectorAll('.TOTAL, div:has(> .text-muted:contains("TOTAL"))')[0];
+    const statTotal = document.getElementById('stat-total');
     const statSent = document.getElementById('stat-sent');
     const statFailed = document.getElementById('stat-failed');
     const statRemaining = document.getElementById('stat-remaining');
@@ -109,14 +163,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let extractedEmails = [];
     let isSending = false;
     let stopRequested = false;
-
-    if (togglePasswordBtn && dashboardPassword) {
-        togglePasswordBtn.addEventListener('click', () => {
-            const type = dashboardPassword.getAttribute('type') === 'password' ? 'text' : 'password';
-            dashboardPassword.setAttribute('type', type);
-            togglePasswordBtn.innerHTML = type === 'password' ? '<i class="fa-regular fa-eye"></i>' : '<i class="fa-regular fa-eye-slash"></i>';
-        });
-    }
 
     function parseRecipients() {
         if (!recipientsInput) return;
@@ -147,18 +193,10 @@ document.addEventListener('DOMContentLoaded', () => {
         isSending = true;
         stopRequested = false;
 
-        const totalEl = document.querySelector('.grid div:nth-child(1) span:nth-child(2)') || statTotal;
-        if (totalEl) totalEl.textContent = total;
-
-        const sentEl = document.querySelector('.grid div:nth-child(2) span:nth-child(2)') || statSent;
-        if (sentEl) sentEl.textContent = '0';
-
-        const failedEl = document.querySelector('.grid div:nth-child(3) span:nth-child(2)') || statFailed;
-        if (failedEl) failedEl.textContent = '0';
-
-        const remEl = document.querySelector('.grid div:nth-child(4) span:nth-child(2)') || statRemaining;
-        if (remEl) remEl.textContent = total;
-
+        if (statTotal) statTotal.textContent = total;
+        if (statSent) statSent.textContent = '0';
+        if (statFailed) statFailed.textContent = '0';
+        if (statRemaining) statRemaining.textContent = total;
         if (progressBar) progressBar.style.width = '0%';
 
         if (statusIcon) statusIcon.className = 'fa-solid fa-shield-halved fa-spin text-primary';
@@ -169,15 +207,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateProgressUI(sentCount, failedCount, total, customText) {
-        const sentEl = document.querySelector('.grid div:nth-child(2) span:nth-child(2)') || statSent;
-        if (sentEl) sentEl.textContent = sentCount;
-
-        const failedEl = document.querySelector('.grid div:nth-child(3) span:nth-child(2)') || statFailed;
-        if (failedEl) failedEl.textContent = failedCount;
+        if (statSent) statSent.textContent = sentCount;
+        if (statFailed) statFailed.textContent = failedCount;
 
         const remaining = Math.max(0, total - (sentCount + failedCount));
-        const remEl = document.querySelector('.grid div:nth-child(4) span:nth-child(2)') || statRemaining;
-        if (remEl) remEl.textContent = remaining;
+        if (statRemaining) statRemaining.textContent = remaining;
 
         const percentage = Math.min(100, Math.round(((sentCount + failedCount) / total) * 100));
         if (progressBar) progressBar.style.width = `${percentage}%`;
@@ -206,7 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const emailVal = dashboardEmail.value ? dashboardEmail.value.trim() : '';
             const appPasswordVal = dashboardPassword.value ? dashboardPassword.value.trim() : '';
             const rawSubject = subject.value ? subject.value.trim() : '';
-            const rawBody = messageBody.value || messageBody.innerHTML || '';
+            const rawBody = messageBody.innerHTML || messageBody.value || '';
 
             if (!emailVal || !appPasswordVal || !rawSubject || !rawBody) {
                 return alert('Please fill in all inputs (Email, App Password, Subject, Body).');
@@ -247,7 +281,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     const batch = recipientsToSend.slice(i, i + BATCH_SIZE);
 
                     const sendPromises = batch.map(async (recipient) => {
-                        const obfuscatedBody = injectZeroWidthSpaces(rawBody);
                         try {
                             const sendRes = await fetch('/api/send-single', {
                                 method: 'POST',
@@ -257,7 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     email: emailVal,
                                     appPassword: appPasswordVal,
                                     subject: rawSubject,
-                                    messageBody: obfuscatedBody,
+                                    messageBody: rawBody,
                                     to: recipient
                                 })
                             });
