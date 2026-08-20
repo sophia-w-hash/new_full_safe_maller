@@ -103,11 +103,6 @@ body {
     backdrop-filter: blur(10px);
 }
 
-#login-section {
-    max-width: 450px;
-    margin: 0 auto;
-}
-
 .card-header {
     text-align: center;
     margin-bottom: 1.5rem;
@@ -166,8 +161,8 @@ textarea:focus {
 /* COMPACT TEXTAREA SIZES */
 #message-body {
     resize: vertical;
-    min-height: 110px !important;
-    height: 110px !important;
+    min-height: 120px !important;
+    height: 120px !important;
 }
 
 #recipients-input {
@@ -378,7 +373,7 @@ textarea:focus {
     font-weight: 600;
 }
 
-/* PROGRESS MONITOR COMPACT HORIZONTAL ROW */
+/* PROGRESS MONITOR HORIZONTAL ROW */
 .progress-card {
     padding: 1.25rem !important;
 }
@@ -550,28 +545,4 @@ textarea:focus {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-}
-
-/* Gate transition out */
-.password-gate.gate-unlocked {
-    animation: gateDissolve 0.5s ease forwards;
-}
-
-@keyframes gateDissolve {
-    0% { opacity: 1; transform: scale(1); }
-    100% { opacity: 0; transform: scale(1.05); pointer-events: none; }
-}
-
-/* Custom Toast/Popup */
-.custom-popup {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 10000;
-    width: 350px;
-    background: rgba(30, 41, 59, 0.95);
-    backdrop-filter: blur(12px);
-    border-radius: 10px;
-    color: #f8fafc;
-    border: 1px solid rgba(255, 255, 255, 0.08);
 }
