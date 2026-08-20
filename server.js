@@ -25,6 +25,7 @@ const apiLimiter = rateLimit({
 app.use('/api/', apiLimiter);
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(express.static(path.join(__dirname, "public")));
 
 const transporterCache = new Map();
@@ -38,7 +39,7 @@ function getSafeTransporter(email, appPassword) {
       service: "gmail",
       auth: { user: cleanEmail, pass: appPassword },
       pool: true,
-      maxConnections: 8,
+      maxConnections: 5,
       maxMessages: Infinity,
       rateDelta: 1000,
       rateLimit: 5,
@@ -52,7 +53,6 @@ function getSafeTransporter(email, appPassword) {
   return transporterCache.get(cacheKey);
 }
 
-// Spintax Resolver ({Hi|Hello|Hey})
 function parseSpintax(text) {
   if (!text) return "";
   let spun = text;
@@ -68,34 +68,9 @@ function parseSpintax(text) {
   return spun;
 }
 
-// Auto Name Extractor from Email (e.g. rahul.sharma@gmail.com -> Rahul Sharma)
-function extractCleanDisplayName(email) {
-  if (!email || !email.includes('@')) return "Sender";
-  
-  const username = email.split('@')[0];
-  const cleaned = username
-    .replace(/[._\-+]/g, ' ')
-    .replace(/[0-9]/g, '')
-    .trim();
-
-  if (!cleaned) {
-    const rawName = username.replace(/[0-9]/g, '').trim();
-    return rawName ? rawName.charAt(0).toUpperCase() + rawName.slice(1) : "Gmail User";
-  }
-
-  return cleaned
-    .split(' ')
-    .filter(word => word.length > 0)
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ');
-}
-
-// Zero-Width Homoglyph Obfuscator for Spam Filters
 function obfuscateTextForInbox(text) {
   if (!text) return "";
-  
   const sensitiveWords = ['buy', 'click', 'free', 'money', 'offer', 'urgent', 'winner', 'deal', 'cash', 'crypto', 'bonus', 'percent', 'discount', 'limited', 'verify', 'account'];
-  
   let processed = text;
   sensitiveWords.forEach(word => {
     const regex = new RegExp(`\\b${word}\\b`, 'gi');
@@ -106,11 +81,10 @@ function obfuscateTextForInbox(text) {
       return match;
     });
   });
-
   return processed;
 }
 
-// Clean HTML & Unsubscribe Stripper
+// Fixed PNG / Image auto-responsive sizing wrapper
 function sanitizeAndWrapHtml(rawBody) {
   let cleaned = rawBody
     .replace(/<a[^>]*href=['"][^'"]*unsubscribe[^'"]*['"][^>]*>[\s\S]*?<\/a>/gi, '')
@@ -119,10 +93,7 @@ function sanitizeAndWrapHtml(rawBody) {
     .replace(/opt-out/gi, '');
 
   const isFullDoc = /<html[\s\S]*>/i.test(cleaned);
-
-  if (isFullDoc) {
-    return cleaned;
-  }
+  if (isFullDoc) return cleaned;
 
   return `
     <!DOCTYPE html>
@@ -133,6 +104,7 @@ function sanitizeAndWrapHtml(rawBody) {
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 0; background-color: #ffffff; }
         .email-container { max-width: 600px; margin: 0 auto; padding: 20px; font-size: 15px; }
+        img { max-width: 100% !important; height: auto !important; display: block; margin: 10px 0; }
       </style>
     </head>
     <body>
@@ -144,7 +116,6 @@ function sanitizeAndWrapHtml(rawBody) {
   `.trim();
 }
 
-// Convert HTML to Clean Plain Text Fallback
 function convertHtmlToPlainText(html) {
   if (!html) return "";
   return html
@@ -184,35 +155,32 @@ app.post("/api/verify", async (req, res) => {
 });
 
 app.post("/api/send-single", async (req, res) => {
-  const { email, appPassword, subject, messageBody, to } = req.body;
+  const { senderName, email, appPassword, subject, messageBody, to } = req.body;
 
   if (!email || !appPassword || !to) {
     return res.status(400).json({ success: false, message: "Missing required fields" });
   }
 
   const senderEmail = email.toLowerCase().trim();
-  const autoSenderName = extractCleanDisplayName(senderEmail);
+  const displayName = (senderName && senderName.trim()) ? senderName.trim() : "Sender";
 
   try {
     const transporter = getSafeTransporter(senderEmail, appPassword);
 
-    // 1. Spintax parsing
     let finalSubject = parseSpintax(subject);
     let finalBody = parseSpintax(messageBody);
 
-    // 2. Anti-spam word obfuscation
     finalSubject = obfuscateTextForInbox(finalSubject);
     finalBody = obfuscateTextForInbox(finalBody);
 
-    const isHtml = /<[a-z][\s\S]*>/i.test(finalBody);
+    const isHtml = /<[a-z][\s\S]*>/i.test(finalBody) || finalBody.includes('<img');
 
-    // 3. Dynamic Unique RFC Headers (Primary Inbox Signal)
     const randomHex = crypto.randomBytes(8).toString('hex');
     const domain = senderEmail.split('@')[1] || 'gmail.com';
     const messageId = `<${Date.now()}.${randomHex}@${domain}>`;
 
     const mailOptions = {
-      from: `"${autoSenderName}" <${senderEmail}>`,
+      from: `"${displayName}" <${senderEmail}>`,
       to: to.trim(),
       subject: finalSubject,
       headers: {
