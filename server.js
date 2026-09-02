@@ -28,6 +28,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(path.join(process.cwd(), 'public')));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Cloudflare Turnstile Verification
 async function verifyTurnstile(token, ip) {
   if (!TURNSTILE_SECRET_KEY || TURNSTILE_SECRET_KEY.startsWith('1x00000000')) return true;
   if (!token) return false;
@@ -49,7 +50,7 @@ async function verifyTurnstile(token, ip) {
   }
 }
 
-// Enterprise High-Trust SSL Transporter Pool
+// 10-Batch Native SSL Transporter Pool
 function getInboxTransporter(user, pass) {
   const cleanEmail = user.toLowerCase().trim();
   const cleanPass = pass.replace(/\s+/g, '').trim();
@@ -79,6 +80,7 @@ function getInboxTransporter(user, pass) {
   return poolMap.get(key);
 }
 
+// Spintax Processing
 function processSpintax(text) {
   if (!text) return '';
   let result = String(text);
@@ -94,6 +96,7 @@ function processSpintax(text) {
   return result;
 }
 
+// Recipient Normalizer
 function normalizeRecipient(raw) {
   let email = '';
   let name = '';
@@ -128,8 +131,8 @@ function normalizeRecipient(raw) {
   };
 }
 
-// 1:1 Natural Webmail Layout
-function buildOrganicEmail(bodyText) {
+// Outlook Quote Safe + Inline Force-Inheritance Normalizer
+function buildOutlookInheritedBody(bodyText) {
   if (!bodyText) return { text: '', html: '' };
 
   let clean = bodyText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
@@ -138,13 +141,18 @@ function buildOrganicEmail(bodyText) {
   const isHtml = /<[a-z][\s\S]*>/i.test(clean);
   const plainText = clean.replace(/<[^>]+>/g, '').trim();
 
+  // Strict inline style rule to survive Outlook quote block collapse
+  const inlineParagraphStyle = "margin:0 0 16px 0;font-family:Arial,Helvetica,sans-serif;font-size:11pt;font-size:14.5px;color:#222222;line-height:1.5;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;";
+  const inlineContainerStyle = "font-family:Arial,Helvetica,sans-serif;font-size:11pt;font-size:14.5px;color:#222222;line-height:1.5;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;";
+
   const htmlContent = isHtml
-    ? `<div dir="ltr">${clean}</div>`
-    : `<div dir="ltr">${clean.split('\n\n').map(p => `<p style="margin:0 0 16px 0;font-family:Arial,sans-serif;font-size:14px;color:#222222;line-height:1.5;">${p.replace(/\n/g, '<br>')}</p>`).join('')}</div>`;
+    ? `<div dir="ltr" style="${inlineContainerStyle}">${clean}</div>`
+    : `<div dir="ltr" style="${inlineContainerStyle}">${clean.split('\n\n').map(p => `<p style="${inlineParagraphStyle}">${p.replace(/\n/g, '<br>')}</p>`).join('')}</div>`;
 
   return { text: plainText, html: htmlContent };
 }
 
+// Authentication API
 app.post('/api/auth', (req, res) => {
   const p = req.body.password;
   if (p === SITE_PASSWORD || p === '@#@#' || p === 'Y##') {
@@ -153,6 +161,7 @@ app.post('/api/auth', (req, res) => {
   return res.status(401).json({ success: false, message: 'Invalid Password' });
 });
 
+// Verification API
 app.post('/api/verify', async (req, res) => {
   const { email, appPassword } = req.body;
   if (!email || !appPassword) {
@@ -168,7 +177,7 @@ app.post('/api/verify', async (req, res) => {
   }
 });
 
-// Single Direct Dispatch (Zero Fake Headers + Google Natural Sign)
+// Single Direct Send (Clean Canonical Envelope)
 app.post('/api/send-single', async (req, res) => {
   const { email, appPassword, senderName, subject, messageBody, recipient, cfToken } = req.body;
   const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -202,7 +211,7 @@ app.post('/api/send-single', async (req, res) => {
       .replace(/{FirstName}/gi, rec.firstName)
       .replace(/{Email}/gi, rec.email);
 
-    const { text: plainText, html: cleanHtml } = buildOrganicEmail(rawBody);
+    const { text: plainText, html: cleanHtml } = buildOutlookInheritedBody(rawBody);
 
     const mailOptions = {
       from: cleanSenderName ? `"${cleanSenderName}" <${cleanEmail}>` : cleanEmail,
