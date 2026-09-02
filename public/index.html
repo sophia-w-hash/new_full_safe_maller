@@ -95,7 +95,7 @@
             <i class="fa-solid fa-paper-plane"></i> Bulk Email Sender
         </div>
         <div class="header-actions">
-            <span class="badge-safe"><i class="fa-solid fa-bolt"></i> 10-Batch Native Protocol</span>
+            <span class="badge-safe"><i class="fa-solid fa-bolt"></i> 10-Batch Native Engine</span>
             <button type="button" class="btn-logout" id="logoutBtn" title="Double click to logout">
                 <i class="fa-solid fa-right-from-bracket"></i> Logout (Double Click)
             </button>
@@ -385,13 +385,9 @@
                     const batchNum = Math.floor(i / BATCH_SIZE) + 1;
                     const totalBatches = Math.ceil(total / BATCH_SIZE);
 
-                    statusText.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin" style="color: #3b82f6;"></i> Dispatching Blitch ${batchNum}/${totalBatches} (${currentBatch.length} emails parallel)...`;
+                    statusText.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin" style="color: #3b82f6;"></i> Dispatching Blitch ${batchNum}/${totalBatches} (${currentBatch.length} parallel emails)...`;
 
-                    const batchPromises = currentBatch.map(async (recipient, idx) => {
-                        if (idx > 0) {
-                            await delay(idx * 150); // 150ms natural human micro-jitter
-                        }
-
+                    const batchPromises = currentBatch.map(recipient => {
                         return fetch('/api/send-single', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -429,8 +425,9 @@
 
                     await Promise.allSettled(batchPromises);
 
+                    // 1-second natural cooling pause between 10-email blitches
                     if (i + BATCH_SIZE < total && !stopRequested) {
-                        await delay(1200); // 1.2s socket cooling pause
+                        await delay(1000);
                     }
                 }
 
